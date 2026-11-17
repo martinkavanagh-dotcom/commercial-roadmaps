@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <base target="_top">
+    <title>Commercial Roadmaps - OSTTRA</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Global OSTTRA Branding & Styling Variables -->
+    <style>
+      :root {
+        --osttra-teal: #00A3A6;
+        --osttra-teal-dark: #008285;
+        --osttra-teal-light: #e6f6f6;
+        --osttra-teal-border: #7fd1d3;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+
+      .text-osttra-teal {
+        color: var(--osttra-teal);
+      }
+
+      .bg-osttra-teal {
+        background-color: var(--osttra-teal);
+      }
+
+      .border-osttra-teal {
+        border-color: var(--osttra-teal);
+      }
+
+      /* Interactive card hover transitions to OSTTRA Teal */
+      .card-interactive {
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        border: 1px solid #e2e8f0;
+      }
+
+      .card-interactive:hover:not(.card-disabled) {
+        border-color: var(--osttra-teal);
+        box-shadow: 0 10px 25px -5px rgba(0, 163, 166, 0.15), 0 8px 10px -6px rgba(0, 163, 166, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .card-interactive:hover:not(.card-disabled) .card-title {
+        color: var(--osttra-teal);
+      }
+
+      .card-disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        background-color: #f8fafc;
+      }
+
+      /* Custom checkbox accent */
+      input[type="checkbox"]:checked {
+        accent-color: var(--osttra-teal);
+      }
+    </style>
+
+    <!-- React 18 & ReactDOM (Pinned UMD Versions) -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+
+    <script>
+      window.addEventListener('error', function(e) {
+        var root = document.getElementById('root');
+        if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
+          root.innerHTML = '<div style="font-family:sans-serif;padding:30px;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;margin:20px;border-radius:12px;">' +
+            '<h2 style="font-size:16px;font-weight:bold;margin-bottom:8px;">Commercial Roadmaps Initialization Error</h2>' +
+            '<p style="font-size:13px;color:#451a03;font-family:monospace;white-space:pre-wrap;">' + (e.message || e) + '</p>' +
+            '<p style="font-size:11px;color:#78716c;margin-top:12px;">Line: ' + e.lineno + ', Col: ' + e.colno + '</p>' +
+            '</div>';
+        }
+      });
+    </script>
+  </head>
+  <body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+    <div id="root"></div>
+    <?!= include('App'); ?>
+  </body>
+</html>

@@ -1,0 +1,2228 @@
+<script type="text/babel">
+  const { useState, useEffect, useMemo } = React;
+
+  /**
+   * OSTTRA Quarter Gradient Mapping
+   * Matches the visual design system of the OSTTRA Link Roadmap.
+   */
+  const QUARTER_GRADIENTS = {
+    'Q4': 'linear-gradient(135deg, #F78B39 0%, #E34A4C 100%)',
+    'Q1': 'linear-gradient(135deg, #E34A4C 0%, #CA0F61 100%)',
+    'Q2': 'linear-gradient(135deg, #CA0F61 0%, #AB1E76 100%)',
+    'Q3': 'linear-gradient(135deg, #AB1E76 0%, #8B2E8B 100%)',
+    'BL': 'linear-gradient(135deg, #8B2E8B 0%, #621458 100%)',
+    'Delivered': 'linear-gradient(135deg, #2A818E 0%, #00A3A6 100%)',
+    'Pending Scheduling': 'linear-gradient(135deg, #8B2E8B 0%, #621458 100%)'
+  };
+
+  const MONTHS = [
+    'TBC', 'January', 'February', 'March', 'April', 'May', 'June', 
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const STANDARD_QUARTERS = ['Q4', 'Q1', 'Q2', 'Q3', 'BL', 'Delivered'];
+
+  /**
+   * Executive 3 Time Horizons
+   * Iconic OSTTRA warm orange/red -> magenta -> plum deep violet gradients.
+   */
+  const TIME_HORIZONS = [
+    {
+      key: 'now',
+      id: 'Now',
+      title: 'Now',
+      tag: 'Delivered / Planned',
+      subtitle: '(Last & Next Quarter)',
+      headerGradient: 'linear-gradient(90deg, #FE953D 0%, #E3324A 100%)',
+      accentColor: '#FE953D',
+      tagBg: 'bg-white/20 text-white'
+    },
+    {
+      key: 'next',
+      id: 'Next',
+      title: 'Next',
+      tag: 'Indicative',
+      subtitle: '(Next 6 Months)',
+      headerGradient: 'linear-gradient(90deg, #E3324A 0%, #D60050 50%, #C0006B 100%)',
+      accentColor: '#D60050',
+      tagBg: 'bg-white/20 text-white'
+    },
+    {
+      key: 'later',
+      id: 'Later',
+      title: 'Later',
+      tag: 'Conceptual',
+      subtitle: '(In Planning)',
+      headerGradient: 'linear-gradient(90deg, #C0006B 0%, #9300A1 100%)',
+      accentColor: '#9300A1',
+      tagBg: 'bg-white/20 text-white'
+    }
+  ];
+
+  const ENHANCEMENT_THEMES = [
+    {
+      id: 'platform',
+      name: 'Platform Enhancements',
+      color: '#2A818E' // Teal 700
+    },
+    {
+      id: 'functional',
+      name: 'Functional & Usability',
+      color: '#D60050' // Rubine 600 (Hero Accent)
+    },
+    {
+      id: 'connectivity',
+      name: 'Connectivity & Coverage',
+      color: '#04557D' // Sapphire 700
+    }
+  ];
+
+  function getThemeName(item) {
+    const raw = String(item.theme || item.category || item.deliverable || '').toLowerCase();
+    if (raw.includes('platform') || raw.includes('cloud') || raw.includes('failover') || raw.includes('infra') || raw.includes('tech debt') || raw.includes('architecture') || raw.includes('security') || raw.includes('performance') || raw.includes('latency')) {
+      return 'Platform Enhancements';
+    }
+    if (raw.includes('connect') || raw.includes('cover') || raw.includes('feed') || raw.includes('ingest') || raw.includes('api') || raw.includes('partner') || raw.includes('clearing house') || raw.includes('asset class')) {
+      return 'Connectivity & Coverage';
+    }
+    return 'Functional & Usability';
+  }
+
+  function getHorizonKey(item) {
+    const r = String(item.roadmap || '').trim().toLowerCase();
+    if (r === 'now' || r === 'q4' || r === 'q1' || r === 'delivered' || r.includes('now')) return 'now';
+    if (r === 'next' || r === 'q2' || r === 'q3' || r.includes('next')) return 'next';
+    if (r === 'later' || r === 'bl' || r === 'backlog' || r.includes('later') || r.includes('plan')) return 'later';
+    return 'now';
+  }
+
+  function getUserIdentity(serverUser) {
+    if (serverUser && serverUser !== 'anonymous') {
+      return serverUser;
+    }
+    try {
+      const stored = localStorage.getItem('osttra_user_identity');
+      if (stored) return stored;
+    } catch (e) {}
+    return 'Martin Kavanagh (Product Lead)';
+  }
+
+  /**
+   * Lifecycle & Jira Badge Component
+   * Identical to OSTTRA Link Roadmap card footer metadata.
+   */
+  function LifecycleBadge({ item, isPrint = false }) {
+    const hasUat = item.uatDate && item.uatDate !== 'TBC';
+    const hasRel = item.releaseDate && item.releaseDate !== 'TBC';
+    const isSynced = item.jiraStatus === 'Synced';
+
+    if (!hasUat && !hasRel && !isSynced) return null;
+
+    return (
+      <div className={`mt-1.5 flex items-center gap-1.5 flex-wrap ${isPrint ? 'scale-90 origin-left' : ''}`}>
+        {isSynced && (
+          <div className="flex items-center bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 shadow-2xs">
+            <span className="text-[7px] font-black text-emerald-600 uppercase tracking-tighter mr-1">JIRA</span>
+            <span className="text-[8px] font-bold text-emerald-800 tracking-tight whitespace-nowrap">SYNCED</span>
+          </div>
+        )}
+        {hasUat && (
+          <div className="flex items-center bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 shadow-2xs">
+            <span className="text-[7px] font-black text-indigo-400 uppercase tracking-tighter mr-1">UAT</span>
+            <span className="text-[8px] font-bold text-indigo-700 tracking-tight whitespace-nowrap">{item.uatDate}</span>
+          </div>
+        )}
+        {hasUat && hasRel && <span className="text-slate-300 text-[10px]">→</span>}
+        {hasRel && (
+          <div className="flex items-center bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 shadow-2xs">
+            <span className="text-[7px] font-black text-emerald-500 uppercase tracking-tighter mr-1">REL</span>
+            <span className="text-[8px] font-bold text-emerald-700 tracking-tight whitespace-nowrap">{item.releaseDate}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /**
+   * Interactive Card Edit Modal
+   * Allows editing commercial deliverable title, moving quarter, updating category, theme, and dates.
+   */
+  function EditCardModal({ item, isOpen, onClose, onSave, onRemove }) {
+    if (!isOpen || !item) return null;
+
+    const [deliverable, setDeliverable] = useState(item.deliverable || '');
+    const [roadmap, setRoadmap] = useState(item.roadmap || 'Q4');
+    const [category, setCategory] = useState(item.category || 'Strategic');
+    const [theme, setTheme] = useState(item.theme || 'General');
+    const [uatDate, setUatDate] = useState(item.uatDate || 'TBC');
+    const [releaseDate, setReleaseDate] = useState(item.releaseDate || 'TBC');
+    const [isFunctional, setIsFunctional] = useState(!!item.isFunctional);
+    const [isTechnical, setIsTechnical] = useState(!!item.isTechnical);
+    const [isNotInPpm, setIsNotInPpm] = useState(!!item.isNotInPpm);
+
+    const handleSave = () => {
+      onSave({
+        ...item,
+        deliverable,
+        roadmap,
+        category,
+        theme,
+        uatDate,
+        releaseDate,
+        isFunctional,
+        isTechnical,
+        isNotInPpm
+      });
+      onClose();
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          {/* Modal Header */}
+          <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
+                {item.jiraKey || 'ITEM'}
+              </span>
+              <h3 className="text-sm font-bold text-slate-800">Edit Commercial Deliverable</h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 leading-none"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            {/* Commercial Deliverable Title */}
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                Commercial Deliverable (Title)
+              </label>
+              <textarea
+                value={deliverable}
+                onChange={(e) => setDeliverable(e.target.value)}
+                rows={3}
+                className="w-full text-xs font-medium p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-osttra-teal outline-none transition-all"
+                placeholder="Enter client-facing commercial value proposition..."
+              />
+              {item.originalDeliverable && (
+                <p className="text-[10px] text-slate-400 mt-1 italic">
+                  Original PRF: {item.originalDeliverable}
+                </p>
+              )}
+            </div>
+
+            {/* Quarter / Horizon & Category */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                  Target Quarter
+                </label>
+                <select
+                  value={roadmap}
+                  onChange={(e) => setRoadmap(e.target.value)}
+                  className="w-full text-xs font-bold p-2.5 bg-white border border-slate-300 rounded-xl focus:border-osttra-teal outline-none cursor-pointer"
+                >
+                  {STANDARD_QUARTERS.map((q) => (
+                    <option key={q} value={q}>
+                      {q} Horizon
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                  Commercial Category
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full text-xs font-bold p-2.5 bg-white border border-slate-300 rounded-xl focus:border-osttra-teal outline-none cursor-pointer"
+                >
+                  <option value="Strategic">Strategic</option>
+                  <option value="Regulatory">Regulatory</option>
+                  <option value="Performance & Scalability">Performance & Scalability</option>
+                  <option value="Client Partnership">Client Partnership</option>
+                  <option value="Platform Resilience">Platform Resilience</option>
+                  <option value="Operational Excellence">Operational Excellence</option>
+                  <option value="Market Expansion">Market Expansion</option>
+                  <option value="Risk Management">Risk Management</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Strategic Theme */}
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                Strategic Theme
+              </label>
+              <select
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+                className="w-full text-xs font-semibold p-2.5 bg-white border border-slate-300 rounded-xl focus:border-osttra-teal outline-none cursor-pointer"
+              >
+                <option value="Platform Enhancements">Platform Enhancements</option>
+                <option value="Functional & Usability">Functional & Usability</option>
+                <option value="Connectivity & Coverage">Connectivity & Coverage</option>
+              </select>
+            </div>
+
+            {/* Development Category Badges (from OSTTRA Link Roadmap) */}
+            <div className="pt-2 border-t border-slate-100">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">
+                Development Categories
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFunctional(!isFunctional)}
+                  className={`flex items-center gap-1.5 p-2 rounded-xl border text-left text-xs font-bold transition-all ${
+                    isFunctional
+                      ? 'bg-[#2A818E]/10 border-[#2A818E] text-[#2A818E] shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] shrink-0 border ${
+                    isFunctional ? 'bg-[#2A818E] border-[#2A818E] text-white' : 'border-slate-300 bg-white'
+                  }`}>
+                    {isFunctional ? '✓' : ''}
+                  </span>
+                  <span className="text-[10px] truncate">Functional</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTechnical(!isTechnical)}
+                  className={`flex items-center gap-1.5 p-2 rounded-xl border text-left text-xs font-bold transition-all ${
+                    isTechnical
+                      ? 'bg-[#8B2E8B]/10 border-[#8B2E8B] text-[#8B2E8B] shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] shrink-0 border ${
+                    isTechnical ? 'bg-[#8B2E8B] border-[#8B2E8B] text-white' : 'border-slate-300 bg-white'
+                  }`}>
+                    {isTechnical ? '✓' : ''}
+                  </span>
+                  <span className="text-[10px] truncate">Technical</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsNotInPpm(!isNotInPpm)}
+                  className={`flex items-center gap-1.5 p-2 rounded-xl border text-left text-xs font-bold transition-all ${
+                    isNotInPpm
+                      ? 'bg-[#696C7B]/10 border-[#696C7B] text-[#696C7B] shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] shrink-0 border ${
+                    isNotInPpm ? 'bg-[#696C7B] border-[#696C7B] text-white' : 'border-slate-300 bg-white'
+                  }`}>
+                    {isNotInPpm ? '✓' : ''}
+                  </span>
+                  <span className="text-[10px] truncate">Not in PPM</span>
+                </button>
+              </div>
+            </div>
+
+            {/* UAT & Release Target Months */}
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  🕒 UAT Month
+                </label>
+                <select
+                  value={uatDate}
+                  onChange={(e) => setUatDate(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 font-medium"
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  📆 Release Month
+                </label>
+                <select
+                  value={releaseDate}
+                  onChange={(e) => setReleaseDate(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 font-medium"
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Are you sure you want to remove this item from the roadmap?')) {
+                  onRemove(item.id);
+                  onClose();
+                }
+              }}
+              className="text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+            >
+              <span>🗑</span> Remove from Roadmap
+            </button>
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="px-5 py-2 bg-osttra-teal hover:bg-[#008285] text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * TimelineColumn Component
+   * Supports Drag-and-Drop between quarters, theme groupings, card click editing, and trash removal.
+   */
+  function TimelineColumn({ 
+    quarter, 
+    itemsByTheme, 
+    onDropItem, 
+    onCardClick, 
+    onRemoveItem,
+    onChangeQuarterQuick,
+    isPrint = false 
+  }) {
+    const themes = Object.keys(itemsByTheme || {}).sort();
+    const gradient = QUARTER_GRADIENTS[quarter] || 'linear-gradient(135deg, #CA0F61 0%, #8B2E8B 100%)';
+    const totalCount = Object.values(itemsByTheme || {}).reduce((acc, curr) => acc + curr.length, 0);
+
+    return (
+      <div 
+        className={`flex flex-col h-full bg-[#F7F7F9] rounded-xl border border-[#D1D1D4] overflow-hidden shadow-sm transition-colors ${
+          isPrint ? 'print:border-slate-300' : ''
+        }`}
+        onDragOver={(e) => {
+          if (!isPrint) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (isPrint) return;
+          e.preventDefault();
+          const itemId = e.dataTransfer.getData('text/plain');
+          if (itemId && onDropItem) {
+            onDropItem(itemId, quarter);
+          }
+        }}
+      >
+        {/* Column Header */}
+        <div 
+          style={{ background: gradient }}
+          className="px-4 py-3 flex items-center justify-between shrink-0 shadow-sm"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-white font-black text-xs tracking-wider uppercase drop-shadow-sm">
+              {quarter}
+            </span>
+          </div>
+          <span className="text-[9px] font-black text-white/90 bg-black/20 px-2 py-0.5 rounded-full">
+            {totalCount} items
+          </span>
+        </div>
+
+        {/* Column Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-2.5 space-y-3 min-h-[450px]">
+          {themes.length > 0 ? (
+            themes.map((theme) => {
+              const items = itemsByTheme[theme] || [];
+              return (
+                <div key={theme} className="space-y-1.5">
+                  {/* Theme Header */}
+                  <div className="flex items-center gap-1.5 pb-1 border-b border-slate-200">
+                    <span className="text-[10px] font-black text-black uppercase tracking-widest">{theme}</span>
+                    <span className="text-[8px] font-bold text-slate-400">({items.length})</span>
+                  </div>
+
+                  {/* Cards inside theme */}
+                  <div className="space-y-2">
+                    {items.map((item) => {
+                      const isLive = (item.roadmap || '').toLowerCase() === 'delivered' || 
+                                     (item.category || '').toLowerCase().includes('live') ||
+                                     (item.category || '').toLowerCase().includes('deliver');
+
+                      return (
+                        <div
+                          key={item.id}
+                          draggable={!isPrint}
+                          onDragStart={(e) => {
+                            if (isPrint) return;
+                            e.dataTransfer.setData('text/plain', item.id);
+                            e.currentTarget.style.opacity = '0.4';
+                          }}
+                          onDragEnd={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          className={`p-2.5 rounded-lg bg-[#EFEFF2] shadow-sm border border-[#D1D1D4] group text-left hover:border-slate-400 transition-all hover:shadow-md ${
+                            !isPrint ? 'cursor-grab active:cursor-grabbing' : ''
+                          }`}
+                        >
+                          {/* Top Badges & Actions */}
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isLive && (
+                                <span className="bg-[#2A818E] text-white text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-xs">
+                                  <span>✓</span> LIVE
+                                </span>
+                              )}
+                              {/* Dev Category Dots */}
+                              {item.isFunctional && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#2A818E] inline-block shrink-0 shadow-xs border border-white" title="Functional Dev"></span>
+                              )}
+                              {item.isTechnical && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#8B2E8B] inline-block shrink-0 shadow-xs border border-white" title="Technical Dev"></span>
+                              )}
+                              {item.isNotInPpm && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#696C7B] inline-block shrink-0 shadow-xs border border-white" title="Not in PPM"></span>
+                              )}
+                              {!item.isFunctional && !item.isTechnical && !item.isNotInPpm && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#00A3A6] inline-block shrink-0 shadow-xs border border-white" title="OSTTRA Commercial"></span>
+                              )}
+
+                              {item.jiraKey && (
+                                <span className="text-[7.5px] font-mono font-bold text-indigo-700 bg-white border border-indigo-200 px-1.5 py-0.5 rounded shadow-2xs">
+                                  {item.jiraKey}
+                                </span>
+                              )}
+                              {item.category && (
+                                <span className="text-[7.5px] font-bold text-slate-500 bg-white/80 border border-slate-200 px-1.5 py-0.5 rounded tracking-tighter uppercase">
+                                  {item.category}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Hover Quick Actions */}
+                            {!isPrint && (
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onCardClick(item);
+                                  }}
+                                  className="text-[11px] p-0.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                                  title="Edit deliverable details"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Remove item from roadmap?')) {
+                                      onRemoveItem(item.id);
+                                    }
+                                  }}
+                                  className="text-[11px] p-0.5 text-slate-400 hover:text-red-500 transition-colors"
+                                  title="Remove from roadmap"
+                                >
+                                  🗑
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Deliverable Title (Click to open edit modal) */}
+                          <p 
+                            onClick={() => !isPrint && onCardClick(item)}
+                            className={`${isPrint ? 'text-[9.5px]' : 'text-[11px]'} text-[#212222] font-semibold leading-snug cursor-pointer hover:text-osttra-teal transition-colors`}
+                            title="Click to edit deliverable"
+                          >
+                            {item.deliverable}
+                          </p>
+
+                          {/* Quick Quarter Relocation Dropdown (on hover) */}
+                          {!isPrint && (
+                            <div className="mt-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[9px] text-slate-400">
+                              <span className="font-mono">Move to:</span>
+                              <select
+                                value={item.roadmap || quarter}
+                                onChange={(e) => onChangeQuarterQuick(item.id, e.target.value)}
+                                className="text-[9px] font-bold bg-white/90 border border-slate-300 rounded px-1 py-0.5 text-slate-700 outline-none cursor-pointer"
+                              >
+                                {STANDARD_QUARTERS.map((q) => (
+                                  <option key={q} value={q}>{q}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Lifecycle / Jira Badge */}
+                          <LifecycleBadge item={item} isPrint={isPrint} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="h-32 flex items-center justify-center text-center">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No promotions</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * RoadmapMatrixCell Component
+   * Droppable cell with dynamically sized commercial cards.
+   * Displays ONLY translated commercial text and LIVE badge if live in data.
+   * NO PRF number, NO category dots, NO "Move to" dropdown.
+   */
+  function RoadmapMatrixCell({ horizon, theme, items, onDropItem, onCardClick, onRemoveItem, isPrint = false }) {
+    return (
+      <div
+        className={`flex flex-col h-full bg-slate-50/70 rounded-xl ${
+          isPrint ? 'border border-slate-200/50' : 'border border-dashed border-slate-300/80 hover:border-slate-400'
+        } p-2 transition-colors min-h-[90px]`}
+        onDragOver={(e) => {
+          if (!isPrint) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (isPrint) return;
+          e.preventDefault();
+          const itemId = e.dataTransfer.getData('text/plain');
+          if (itemId && onDropItem) {
+            onDropItem(itemId, horizon.key, theme.name);
+          }
+        }}
+      >
+        <div className="space-y-1.5 flex-1 flex flex-col justify-start">
+          {items.map((item) => {
+            const isLive = (item.roadmap || '').toLowerCase() === 'delivered' || 
+                           (item.category || '').toLowerCase().includes('live') ||
+                           (item.category || '').toLowerCase().includes('deliver') ||
+                           Boolean(item.isLive);
+
+            return (
+              <div
+                key={item.id}
+                draggable={!isPrint}
+                onDragStart={(e) => {
+                  if (isPrint) return;
+                  e.dataTransfer.setData('text/plain', item.id);
+                  e.currentTarget.style.opacity = '0.4';
+                }}
+                onDragEnd={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                }}
+                className={`relative px-2.5 py-2 rounded-lg bg-white shadow-2xs border border-slate-200/90 group text-left hover:border-slate-300 hover:shadow-xs transition-all ${
+                  !isPrint ? 'cursor-grab active:cursor-grabbing' : ''
+                }`}
+              >
+                {/* Live Badge (only rendered when item is truly live in data) */}
+                {isLive && (
+                  <div className="mb-1">
+                    <span className="bg-emerald-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+                      <span>✓</span> LIVE
+                    </span>
+                  </div>
+                )}
+
+                {/* Floating Action controls on hover (absolute, zero vertical whitespace) */}
+                {!isPrint && (
+                  <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-white/95 rounded px-1 py-0.5 shadow-2xs border border-slate-200/70 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCardClick(item);
+                      }}
+                      className="text-[10px] p-0.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                      title="Edit deliverable details"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Remove item from roadmap?')) {
+                          onRemoveItem(item.id);
+                        }
+                      }}
+                      className="text-[10px] p-0.5 text-slate-400 hover:text-red-500 transition-colors"
+                      title="Remove from roadmap"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                )}
+
+                {/* Only translated commercial text - tight leading and padding */}
+                <p
+                  onClick={() => !isPrint && onCardClick(item)}
+                  className="text-[11.5px] font-medium text-slate-800 leading-snug cursor-pointer hover:text-osttra-teal transition-colors pr-3"
+                  title="Click to edit headline"
+                >
+                  {item.deliverable}
+                </p>
+              </div>
+            );
+          })}
+
+          {items.length === 0 && !isPrint && (
+            <div className="flex-1 min-h-[50px] flex items-center justify-center text-center p-1.5 rounded-lg border border-transparent hover:border-dashed hover:border-slate-300 transition-colors">
+              <span className="text-[10px] text-slate-400 font-semibold tracking-wide">
+                Drop items here
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function ThemeMatrixRow({ theme, itemsByHorizon, onDropItem, onCardClick, onRemoveItem, isPrint = false }) {
+    return (
+      <div className="grid grid-cols-12 gap-3.5 items-stretch">
+        {/* Clean Theme Banner (Left Column) - Pure clean theme name only, no extra text */}
+        <div 
+          style={{ borderLeftColor: theme.color }}
+          className="col-span-12 md:col-span-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs border-l-[6px] flex flex-col justify-center transition-all hover:shadow-md"
+        >
+          <h3 className="text-base font-black text-slate-900 tracking-tight leading-snug">
+            {theme.name}
+          </h3>
+        </div>
+
+        {/* 3 Horizon Droppable Cells */}
+        <div className="col-span-12 md:col-span-9 grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {TIME_HORIZONS.map((horizon) => (
+            <RoadmapMatrixCell
+              key={horizon.key}
+              horizon={horizon}
+              theme={theme}
+              items={itemsByHorizon[horizon.key] || []}
+              onDropItem={onDropItem}
+              onCardClick={onCardClick}
+              onRemoveItem={onRemoveItem}
+              isPrint={isPrint}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function CommercialApp() {
+    // Global State & Navigation
+    const [view, setView] = useState('homepage'); // 'homepage' | 'division' | 'generator' | 'timeline'
+    const [selectedDivision, setSelectedDivision] = useState('FX & S');
+    const [selectedProduct, setSelectedProduct] = useState('ETD');
+
+    // Server & Identity State
+    const [serverConfig, setServerConfig] = useState(null);
+    const [currentUser, setCurrentUser] = useState('Martin Kavanagh (Product Lead)');
+    const [loadingConfig, setLoadingConfig] = useState(true);
+
+    // Generator & Staging State
+    const allQuarters = ['Q4', 'Q1', 'Q2', 'Q3', 'BL', 'Delivered'];
+    const [selectedQuarters, setSelectedQuarters] = useState(['Q4', 'Q1', 'Q2', 'Q3']);
+    
+    // Table 1 (Source PRF Data) - Checkboxes unselected by default!
+    const [table1Loading, setTable1Loading] = useState(false);
+    const [table1Data, setTable1Data] = useState([]);
+    const [selectedTable1Ids, setSelectedTable1Ids] = useState(new Set()); // Empty by default!
+    const [dataSourceNotice, setDataSourceNotice] = useState('');
+
+    // Table 2 (Commercial Roadmap Staging) - Checkboxes unselected by default!
+    const [table2Loading, setTable2Loading] = useState(false);
+    const [table2Data, setTable2Data] = useState([]);
+    const [selectedTable2Ids, setSelectedTable2Ids] = useState(new Set()); // Empty by default!
+    const [jiraSyncing, setJiraSyncing] = useState(false);
+    const [editingStagingRowId, setEditingStagingRowId] = useState(null);
+
+    // Final Produced Roadmap State & Editing
+    const [producedRoadmap, setProducedRoadmap] = useState([]);
+    const [modalItem, setModalItem] = useState(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+    // Timeline Filtering
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedThemeFilter, setSelectedThemeFilter] = useState('ALL');
+    const [isDeckView, setIsDeckView] = useState(false);
+    const [savedRoadmapInfo, setSavedRoadmapInfo] = useState(null);
+
+    const persistProducedRoadmap = (prod, items) => {
+      try {
+        localStorage.setItem('osttra_saved_commercial_roadmap', JSON.stringify({
+          product: prod,
+          savedAt: new Date().toISOString(),
+          items: items
+        }));
+        setSavedRoadmapInfo({
+          product: prod,
+          count: items.length,
+          savedAt: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+      } catch (e) {
+        console.warn('Could not persist to localStorage:', e);
+      }
+    };
+
+    // Initialize backend config and saved roadmap
+    useEffect(() => {
+      // 1. Check local storage for previously saved roadmap
+      try {
+        const localSaved = localStorage.getItem('osttra_saved_commercial_roadmap');
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+            setSavedRoadmapInfo({
+              product: parsed.product || 'ETD',
+              count: parsed.items.length,
+              savedAt: new Date(parsed.savedAt || Date.now()).toLocaleDateString()
+            });
+            setProducedRoadmap(parsed.items);
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fetch latest produced roadmap from backend sheet
+      if (window.google && google.script && google.script.run && google.script.run.getLatestProducedRoadmap) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res && res.success && res.items && res.items.length > 0) {
+              setSavedRoadmapInfo({
+                product: res.product || 'ETD',
+                count: res.items.length,
+                savedAt: 'Synced from Sheet'
+              });
+              setProducedRoadmap(res.items);
+            }
+          })
+          .getLatestProducedRoadmap(selectedProduct);
+      }
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res && res.success) {
+              setServerConfig(res);
+              setCurrentUser(getUserIdentity(res.userEmail));
+            }
+            setLoadingConfig(false);
+          })
+          .withFailureHandler((err) => {
+            console.warn('Backend config fallback:', err);
+            setLoadingConfig(false);
+          })
+          .getCommercialRoadmapConfig();
+      } else {
+        setTimeout(() => {
+          setServerConfig({
+            appName: 'Commercial Roadmaps',
+            version: '1.2.0',
+            userEmail: 'martin.kavanagh@osttra.com',
+            databaseStatus: 'Local Standalone Mode'
+          });
+          setCurrentUser('Martin Kavanagh (Product Lead)');
+          setLoadingConfig(false);
+        }, 300);
+      }
+    }, []);
+
+    // Toggle Quarter selection filter
+    const toggleQuarter = (q) => {
+      setSelectedQuarters((prev) => {
+        if (prev.includes(q)) {
+          return prev.filter((item) => item !== q);
+        } else {
+          return [...prev, q];
+        }
+      });
+    };
+
+    // Table 1: Top "Run" button to fetch PRF data
+    const handleFetchPrfData = () => {
+      if (selectedQuarters.length === 0) {
+        alert('Please select at least one quarter filter before running.');
+        return;
+      }
+
+      setTable1Loading(true);
+
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            setTable1Loading(false);
+            if (res && res.success) {
+              setTable1Data(res.items);
+              setDataSourceNotice(res.source || 'Live Google Sheet');
+              // CHECKBOXES UNSELECTED BY DEFAULT:
+              setSelectedTable1Ids(new Set());
+            } else {
+              alert(res?.error || 'Failed to fetch PRF records.');
+            }
+          })
+          .withFailureHandler((err) => {
+            setTable1Loading(false);
+            alert('Error communicating with backend: ' + err.message);
+          })
+          .getPrfData(selectedProduct, selectedQuarters);
+      } else {
+        setTimeout(() => {
+          const mockItems = [
+            { id: 'PRF-ETD-001', product: 'ETD', roadmap: 'Q4', deliverable: 'Fix FIX protocol gateway queue latency under peak clearing volume', category: 'Tech Debt', theme: 'Performance & Connectivity', jiraKey: 'ETD-1021' },
+            { id: 'PRF-ETD-002', product: 'ETD', roadmap: 'Q4', deliverable: 'Implement EMIR Refit XML reporting schema and automated validation', category: 'Regulatory', theme: 'Compliance', jiraKey: 'ETD-1044' },
+            { id: 'PRF-ETD-003', product: 'ETD', roadmap: 'Q1', deliverable: 'Cross-broker real-time trade matching and post-trade allocation router', category: 'Strategic', theme: 'Execution & Clearing', jiraKey: 'ETD-1090' },
+            { id: 'PRF-ETD-004', product: 'ETD', roadmap: 'Q1', deliverable: 'Tier 1 Prime Broker custom clearing trade feed integration and CSV parser', category: 'Client Request', theme: 'Client Partnership', jiraKey: 'ETD-1115' },
+            { id: 'PRF-ETD-005', product: 'ETD', roadmap: 'Q2', deliverable: 'Sub-second intraday margin calculation microservice with SPAN risk checks', category: 'Strategic', theme: 'Risk Management', jiraKey: 'ETD-1152' },
+            { id: 'PRF-ETD-006', product: 'ETD', roadmap: 'Q2', deliverable: 'Automated post-trade exception resolution workflow and audit trail export', category: 'Operational Efficiency', theme: 'Automation', jiraKey: 'ETD-1188' },
+            { id: 'PRF-ETD-007', product: 'ETD', roadmap: 'Q3', deliverable: 'Multi-asset derivatives STP connectivity for regional exchange members', category: 'Strategic', theme: 'Market Expansion', jiraKey: 'ETD-1220' },
+            { id: 'PRF-ETD-008', product: 'ETD', roadmap: 'Q3', deliverable: 'Cloud-native zero-downtime database failover cluster deployment', category: 'Tech Debt', theme: 'Resilience', jiraKey: 'ETD-1245' },
+            { id: 'PRF-ETD-009', product: 'ETD', roadmap: 'BL', deliverable: 'Predictive trade failure alerts using historical trade discrepancy patterns', category: 'Strategic', theme: 'AI & Analytics', jiraKey: 'ETD-1301' },
+            { id: 'PRF-ETD-010', product: 'ETD', roadmap: 'Delivered', deliverable: 'REST API v2 for position management with OAuth 2.0 mTLS authentication', category: 'Strategic', theme: 'Security & API', jiraKey: 'ETD-998' }
+          ];
+          const filtered = mockItems.filter((item) => selectedQuarters.includes(item.roadmap));
+          setTable1Data(filtered);
+          setDataSourceNotice('Default PRF Catalog');
+          setSelectedTable1Ids(new Set());
+          setTable1Loading(false);
+        }, 400);
+      }
+    };
+
+    // Table 1 Checkbox toggle
+    const toggleTable1Checkbox = (id) => {
+      setSelectedTable1Ids((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
+    // Table 1 Select All toggle
+    const toggleTable1SelectAll = () => {
+      if (selectedTable1Ids.size === table1Data.length) {
+        setSelectedTable1Ids(new Set());
+      } else {
+        setSelectedTable1Ids(new Set(table1Data.map((i) => i.id)));
+      }
+    };
+
+    // Table 1 Action: Lower "Run" button to Translate and populate Table 2
+    const handleTranslateToCommercial = () => {
+      const itemsToTranslate = table1Data.filter((item) => selectedTable1Ids.has(item.id));
+      if (itemsToTranslate.length === 0) {
+        alert('Please select at least one deliverable checkbox in Table 1 to convert.');
+        return;
+      }
+
+      setTable2Loading(true);
+
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            setTable2Loading(false);
+            if (res && res.success) {
+              setTable2Data(res.items);
+              // CHECKBOXES UNSELECTED BY DEFAULT:
+              setSelectedTable2Ids(new Set());
+            } else {
+              alert(res?.error || 'Translation failed.');
+            }
+          })
+          .withFailureHandler((err) => {
+            setTable2Loading(false);
+            alert('Backend error: ' + err.message);
+          })
+          .translateCommercialItems(itemsToTranslate);
+      } else {
+        setTimeout(() => {
+          const synthesizeCommercial = (raw) => {
+            if (!raw) return { title: 'Commercial Deliverable', theme: 'Functional & Usability' };
+            let t = String(raw).trim()
+              .replace(/^strategic\s+commercial\s*[:\-]\s*/i, '')
+              .replace(/^commercial\s*[:\-]\s*/i, '')
+              .replace(/^prf\s*[-#]?\s*\d+\s*[:\-]\s*/i, '')
+              .replace(/^\[(bug|task|story|feature|tech debt|enhancement)\]\s*/i, '');
+            const lower = t.toLowerCase();
+            if (lower.includes('latency') || lower.includes('throughput')) return { title: 'Ultra-Low Latency Execution & High-Throughput Processing Engine', theme: 'Platform Enhancements' };
+            if (lower.includes('emir') || lower.includes('refit')) return { title: 'Automated EMIR Refit Regulatory Reporting & Compliance Suite', theme: 'Connectivity & Coverage' };
+            if (lower.includes('matching') || lower.includes('affirmation')) return { title: 'Real-Time Trade Affirmation & Automated Matching Gateway', theme: 'Functional & Usability' };
+            if (lower.includes('allocation') || lower.includes('give-up')) return { title: 'Institutional Trade Allocation & Automated Give-Up Clearing Router', theme: 'Functional & Usability' };
+            if (lower.includes('prime broker') || lower.includes('feed')) return { title: 'Tier-1 Prime Broker Clearing Connectivity & Ingestion Service', theme: 'Platform Enhancements' };
+            if (lower.includes('margin') || lower.includes('risk')) return { title: 'Dynamic Real-Time Margin Calculation & Risk Optimization Engine', theme: 'Connectivity & Coverage' };
+            if (lower.includes('exception') || lower.includes('audit')) return { title: 'Intelligent Post-Trade Exception Resolution & Audit Portal', theme: 'Functional & Usability' };
+            if (lower.includes('stp') || lower.includes('connectivity')) return { title: 'Expanded Multi-Asset STP Connectivity for Global Clearing Members', theme: 'Platform Enhancements' };
+            if (lower.includes('failover') || lower.includes('cloud')) return { title: 'High-Availability Multi-Region Cloud Resilience Infrastructure', theme: 'Platform Enhancements' };
+            if (lower.includes('predictive') || lower.includes('ai')) return { title: 'AI-Powered Predictive Settlement Discrepancy & Risk Analytics', theme: 'Connectivity & Coverage' };
+            if (lower.includes('api') || lower.includes('rest')) return { title: 'Enterprise Open Banking API Suite for Automated Position Management', theme: 'Platform Enhancements' };
+            if (lower.includes('cashflow') || lower.includes('netting')) return { title: 'Automated Bilateral Cash Netting & Real-Time Settlement Visibility', theme: 'Functional & Usability' };
+            if (lower.includes('drop copy') || lower.includes('gateway')) return { title: 'High-Resilience FIX Drop Copy Gateway & Streamlined Trade Feeds', theme: 'Platform Enhancements' };
+            if (lower.includes('regulatory') || lower.includes('compliance')) return { title: 'Global Regulatory Transaction Reporting & Audit Assurance Suite', theme: 'Connectivity & Coverage' };
+            if (lower.includes('clearing') || lower.includes('ccp')) return { title: 'Direct CCP Clearing Gateway & Automated Settlement Ingestion', theme: 'Platform Enhancements' };
+            
+            t = t.replace(/^fix\s+/i, 'Enhanced ');
+            t = t.replace(/^implement\s+/i, 'Automated ');
+            t = t.replace(/^refactor\s+/i, 'Optimized ');
+            t = t.replace(/^upgrade\s+/i, 'Next-Generation ');
+            t = t.replace(/^add\s+/i, 'Enabled ');
+            t = t.replace(/^build\s+/i, 'Automated ');
+            t = t.charAt(0).toUpperCase() + t.slice(1);
+            if (!t.toLowerCase().includes('solution') && !t.toLowerCase().includes('engine') && !t.toLowerCase().includes('service')) {
+              t += ' Solution';
+            }
+            let theme = 'Functional & Usability';
+            if (lower.includes('cloud') || lower.includes('failover') || lower.includes('infra') || lower.includes('platform') || lower.includes('performance') || lower.includes('latency')) {
+              theme = 'Platform Enhancements';
+            } else if (lower.includes('connect') || lower.includes('feed') || lower.includes('ingest') || lower.includes('api') || lower.includes('coverage') || lower.includes('asset class')) {
+              theme = 'Connectivity & Coverage';
+            }
+            return { title: t, theme: theme };
+          };
+
+          const translated = itemsToTranslate.map((item) => {
+            let synth = synthesizeCommercial(item.deliverable);
+            let commercialTitle = typeof synth === 'object' ? synth.title : synth;
+            let commercialTheme = (typeof synth === 'object' && synth.theme) ? synth.theme : (item.theme || 'Functional & Usability');
+            let commercialCategory = item.category;
+
+            if (item.category === 'Tech Debt') commercialCategory = 'Platform Resilience';
+            if (item.category === 'Operational Efficiency') commercialCategory = 'Operational Excellence';
+            if (item.category === 'Client Request') commercialCategory = 'Client Partnership Innovation';
+            if (item.category === 'Regulatory') commercialCategory = 'Regulatory Compliance Assurance';
+            if (item.category === 'Strategic') commercialCategory = 'Market Growth & Value Creation';
+
+            return {
+              id: 'STG-' + item.id,
+              sourcePrfId: item.id,
+              product: item.product,
+              roadmap: item.roadmap,
+              deliverable: commercialTitle,
+              originalDeliverable: item.deliverable,
+              category: commercialCategory,
+              theme: commercialTheme,
+              jiraKey: item.jiraKey,
+              jiraStatus: 'Pending',
+              promoted: false
+            };
+          });
+
+          setTable2Data(translated);
+          setSelectedTable2Ids(new Set());
+          setTable2Loading(false);
+        }, 500);
+      }
+    };
+
+    // Table 2: Update field of a staged item directly (Text, Category, Quarter, etc.)
+    const updateStagedItem = (id, field, value) => {
+      setTable2Data((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+      );
+    };
+
+    // Table 2 Checkbox toggle
+    const toggleTable2Checkbox = (id) => {
+      setSelectedTable2Ids((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
+    // Table 2 Select All toggle
+    const toggleTable2SelectAll = () => {
+      if (selectedTable2Ids.size === table2Data.length) {
+        setSelectedTable2Ids(new Set());
+      } else {
+        setSelectedTable2Ids(new Set(table2Data.map((i) => i.id)));
+      }
+    };
+
+    // Table 2 Sync to Jira action
+    const handleSyncToJira = (targetItemId = null) => {
+      const itemsToSync = targetItemId 
+        ? table2Data.filter((i) => i.id === targetItemId) 
+        : table2Data.filter((i) => selectedTable2Ids.has(i.id));
+
+      if (itemsToSync.length === 0) {
+        alert('Please check at least one deliverable to sync to Jira.');
+        return;
+      }
+
+      setJiraSyncing(true);
+
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            setJiraSyncing(false);
+            if (res && res.success) {
+              const updatedMap = new Map(res.items.map((i) => [i.id, i]));
+              setTable2Data((prev) => prev.map((item) => updatedMap.get(item.id) || item));
+              alert('Successfully synchronized with Jira!');
+            }
+          })
+          .withFailureHandler((err) => {
+            setJiraSyncing(false);
+            alert('Jira sync error: ' + err.message);
+          })
+          .syncCommercialItemsToJira(itemsToSync);
+      } else {
+        setTimeout(() => {
+          const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          setTable2Data((prev) =>
+            prev.map((item) => {
+              if (itemsToSync.some((s) => s.id === item.id)) {
+                return { ...item, jiraStatus: 'Synced', lastSyncedAt: timestamp };
+              }
+              return item;
+            })
+          );
+          setJiraSyncing(false);
+          alert('Simulated Jira Sync Successful!');
+        }, 600);
+      }
+    };
+
+    // Final Action: "Produce Roadmap"
+    const handleProduceRoadmap = () => {
+      const itemsToPromote = table2Data.filter((item) => selectedTable2Ids.has(item.id));
+      if (itemsToPromote.length === 0) {
+        alert('Please select at least one commercial item in Table 2 to produce the roadmap.');
+        return;
+      }
+
+      setProducedRoadmap(itemsToPromote);
+      persistProducedRoadmap(selectedProduct, itemsToPromote);
+
+      if (window.google && google.script && google.script.run) {
+        google.script.run.produceCommercialRoadmap(selectedProduct, itemsToPromote);
+      }
+
+      // Navigate to Timeline View
+      setView('timeline');
+    };
+
+    // -------------------------------------------------------------
+    // TIMELINE ACTIONS: DRAG & DROP & EDITING
+    // -------------------------------------------------------------
+
+    // Drag-and-Drop between matrix horizons and themes
+    const handleDropItem = (itemId, targetHorizon, targetTheme) => {
+      const horizonLabel = targetHorizon === 'now' ? 'Now' : (targetHorizon === 'next' ? 'Next' : 'Later');
+      setProducedRoadmap((prev) => {
+        const next = prev.map((item) => {
+          if (String(item.id) === String(itemId)) {
+            return {
+              ...item,
+              roadmap: horizonLabel,
+              theme: targetTheme || item.theme
+            };
+          }
+          return item;
+        });
+        persistProducedRoadmap(selectedProduct, next);
+        return next;
+      });
+      setTable2Data((prev) =>
+        prev.map((item) =>
+          String(item.id) === String(itemId) ? { ...item, roadmap: horizonLabel, theme: targetTheme || item.theme } : item
+        )
+      );
+    };
+
+    // Quick quarter switcher
+    const handleQuickQuarterChange = (itemId, targetQuarter) => {
+      handleDropItem(itemId, targetQuarter);
+    };
+
+    // Open Edit Modal for a card
+    const handleOpenEditModal = (item) => {
+      setModalItem(item);
+      setIsEditModalOpen(true);
+    };
+
+    // Save changes from Edit Modal
+    const handleSaveModalItem = (updatedItem) => {
+      setProducedRoadmap((prev) =>
+        prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+      );
+      setTable2Data((prev) =>
+        prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+      );
+    };
+
+    // Remove item from roadmap
+    const handleRemoveFromRoadmap = (itemId) => {
+      setProducedRoadmap((prev) => prev.filter((item) => item.id !== itemId));
+      // Uncheck from Table 2 promotion
+      setSelectedTable2Ids((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    };
+
+    // Unique themes in current produced roadmap
+    const availableThemes = useMemo(() => {
+      const set = new Set(producedRoadmap.map((i) => i.theme).filter(Boolean));
+      return Array.from(set).sort();
+    }, [producedRoadmap]);
+
+    // Group produced roadmap items for the 2D customer-facing matrix (Theme x Horizon)
+    const matrixData = useMemo(() => {
+      const data = {};
+      ENHANCEMENT_THEMES.forEach((theme) => {
+        data[theme.name] = { now: [], next: [], later: [] };
+      });
+
+      const filtered = producedRoadmap.filter((item) => {
+        if (selectedThemeFilter !== 'ALL') {
+          const itemTheme = getThemeName(item);
+          if (itemTheme !== selectedThemeFilter && item.theme !== selectedThemeFilter) {
+            return false;
+          }
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = (item.deliverable || '').toLowerCase().includes(q);
+          const matchTheme = (item.theme || '').toLowerCase().includes(q);
+          const matchKey = (item.jiraKey || '').toLowerCase().includes(q);
+          const matchCat = (item.category || '').toLowerCase().includes(q);
+          if (!matchTitle && !matchTheme && !matchKey && !matchCat) return false;
+        }
+        return true;
+      });
+
+      filtered.forEach((item) => {
+        const hKey = getHorizonKey(item);
+        let tName = item.theme;
+        if (!data[tName]) {
+          tName = getThemeName(item);
+        }
+        if (data[tName] && data[tName][hKey]) {
+          data[tName][hKey].push(item);
+        } else {
+          const fallback = ENHANCEMENT_THEMES[0].name;
+          if (data[fallback] && data[fallback][hKey]) {
+            data[fallback][hKey].push(item);
+          }
+        }
+      });
+
+      return data;
+    }, [producedRoadmap, searchQuery, selectedThemeFilter]);
+
+    // Group produced roadmap items by quarter, then by theme (with search & theme filtering)
+    const timelineGroups = useMemo(() => {
+      const groups = {};
+      const activeQuarterCols = selectedQuarters.length > 0 ? selectedQuarters : ['Q4', 'Q1', 'Q2', 'Q3'];
+      activeQuarterCols.forEach((q) => { groups[q] = {}; });
+
+      // Apply Search & Theme Filters
+      const filtered = producedRoadmap.filter((item) => {
+        if (selectedThemeFilter !== 'ALL' && item.theme !== selectedThemeFilter) {
+          return false;
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = (item.deliverable || '').toLowerCase().includes(q);
+          const matchTheme = (item.theme || '').toLowerCase().includes(q);
+          const matchKey = (item.jiraKey || '').toLowerCase().includes(q);
+          const matchCat = (item.category || '').toLowerCase().includes(q);
+          if (!matchTitle && !matchTheme && !matchKey && !matchCat) return false;
+        }
+        return true;
+      });
+
+      filtered.forEach((item) => {
+        const q = item.roadmap || 'BL';
+        if (!groups[q]) groups[q] = {};
+        const theme = item.theme || 'General';
+        if (!groups[q][theme]) groups[q][theme] = [];
+        groups[q][theme].push(item);
+      });
+
+      return groups;
+    }, [producedRoadmap, selectedQuarters, searchQuery, selectedThemeFilter]);
+
+    // Navigation Breadcrumb
+    const renderBreadcrumbs = () => {
+      return (
+        <nav className="flex items-center space-x-2 text-xs font-medium text-slate-500 mb-6">
+          <button 
+            onClick={() => setView('homepage')}
+            className="hover:text-osttra-teal transition-colors"
+          >
+            Commercial Roadmaps
+          </button>
+          {view !== 'homepage' && <span>/</span>}
+          {view !== 'homepage' && (
+            <button 
+              onClick={() => setView('division')}
+              className={`hover:text-osttra-teal transition-colors ${view === 'division' ? 'text-slate-900 font-semibold' : ''}`}
+            >
+              {selectedDivision}
+            </button>
+          )}
+          {(view === 'generator' || view === 'timeline') && <span>/</span>}
+          {(view === 'generator' || view === 'timeline') && (
+            <button 
+              onClick={() => setView('generator')}
+              className={`hover:text-osttra-teal transition-colors ${view === 'generator' ? 'text-slate-900 font-semibold' : ''}`}
+            >
+              {selectedProduct}
+            </button>
+          )}
+          {view === 'timeline' && <span>/</span>}
+          {view === 'timeline' && (
+            <span className="text-slate-900 font-semibold">Official Timeline</span>
+          )}
+        </nav>
+      );
+    };
+
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+        {/* Global OSTTRA Top Header */}
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setView('homepage')}>
+              <div className="h-9 w-9 rounded-lg bg-osttra-teal flex items-center justify-center text-white font-black text-sm shadow-sm tracking-wider">
+                OST
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-lg font-bold text-slate-900 tracking-tight">Commercial Roadmaps</h1>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-emerald-50 text-osttra-teal border border-teal-200">
+                    OSTTRA Suite
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">Enterprise Commercial Strategy & Staging Engine</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              {/* User Identity Pill */}
+              <div className="flex items-center space-x-2 pl-3 border-l border-slate-200">
+                <div className="h-8 w-8 rounded-full bg-teal-50 border border-teal-200 flex items-center justify-center text-xs font-bold text-osttra-teal">
+                  {currentUser.charAt(0).toUpperCase()}
+                </div>
+                <div className="hidden sm:block text-right">
+                  <p className="text-xs font-semibold text-slate-800 leading-tight">{currentUser}</p>
+                  <p className="text-[10px] text-slate-400">Commercial Operations</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* View Container */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {view !== 'homepage' && renderBreadcrumbs()}
+
+          {/* ======================================================== */}
+          {/* VIEW 1: HOMEPAGE (Commercial Roadmaps)                   */}
+          {/* ======================================================== */}
+          {view === 'homepage' && (
+            <div className="max-w-5xl mx-auto py-6">
+              <div className="text-center mb-12">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-teal-50 text-osttra-teal border border-teal-200 mb-4">
+                  <span className="h-2 w-2 rounded-full bg-osttra-teal animate-pulse"></span>
+                  Portfolio Division Selection
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                  Commercial Roadmaps
+                </h2>
+                <p className="mt-3 text-base text-slate-600 max-w-2xl mx-auto">
+                  Select a business division below to explore product roadmaps, review technical PRF inputs from your live Google Sheet, and stage commercial value propositions.
+                </p>
+              </div>
+
+              {/* Active Saved Roadmap Quick Jump Card */}
+              {savedRoadmapInfo && (
+                <div className="mb-10 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-slate-700/60 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#F78B39] to-[#CA0F61] flex items-center justify-center text-2xl shadow-lg shrink-0">
+                      🚀
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          Active Saved Roadmap
+                        </span>
+                        <span className="text-xs text-slate-400">Last updated: {savedRoadmapInfo.savedAt}</span>
+                      </div>
+                      <h3 className="text-xl font-black text-white tracking-tight mt-1">
+                        {savedRoadmapInfo.product} Commercial Roadmap ({savedRoadmapInfo.count} Deliverables)
+                      </h3>
+                      <p className="text-xs text-slate-300 mt-0.5">
+                        Jump straight into your saved customer-facing matrix.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(savedRoadmapInfo.product || 'ETD');
+                        setView('timeline');
+                      }}
+                      className="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-wider bg-white text-slate-900 hover:bg-slate-100 transition-all shadow-lg hover:shadow-xl hover:scale-102 cursor-pointer flex items-center gap-2"
+                    >
+                      <span>Open Saved Roadmap</span>
+                      <span>&rarr;</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Division Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div
+                  onClick={() => {
+                    setSelectedDivision('FX & S');
+                    setView('division');
+                  }}
+                  className="card-interactive bg-white rounded-2xl p-8 cursor-pointer text-center relative overflow-hidden group shadow-xs"
+                >
+                  <div className="h-14 w-14 mx-auto rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-osttra-teal font-black text-xl mb-6 group-hover:scale-105 transition-transform">
+                    FX
+                  </div>
+                  <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">
+                    FX & S
+                  </h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">
+                    Foreign Exchange & Securities
+                  </p>
+                  <p className="text-xs text-slate-600 mt-4 leading-relaxed">
+                    Derivatives clearing, trade matching, execution connectivity, and risk calculation engines.
+                  </p>
+
+                  <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-xs font-bold text-osttra-teal">
+                    <span>Enter Division</span>
+                    <span>&rarr;</span>
+                  </div>
+                </div>
+
+                <div className="card-disabled rounded-2xl p-8 text-center relative overflow-hidden border border-slate-200">
+                  <div className="h-14 w-14 mx-auto rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 font-black text-xl mb-6">
+                    RC
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-500">
+                    R&C
+                  </h3>
+                  <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
+                    Rates & Credit
+                  </p>
+                  <p className="text-xs text-slate-400 mt-4 leading-relaxed">
+                    IRS processing, credit default swap confirmation, and bilateral lifecycle workflow.
+                  </p>
+                  <div className="mt-8 pt-6 border-t border-slate-200/60 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400">
+                    <span>Planned Next Phase</span>
+                  </div>
+                </div>
+
+                <div className="card-disabled rounded-2xl p-8 text-center relative overflow-hidden border border-slate-200">
+                  <div className="h-14 w-14 mx-auto rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 font-black text-xl mb-6">
+                    TL
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-500">
+                    TL
+                  </h3>
+                  <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
+                    Trade Lifecycle
+                  </p>
+                  <p className="text-xs text-slate-400 mt-4 leading-relaxed">
+                    TriResolve, portfolio reconciliation, collateral management, and benchmarking services.
+                  </p>
+                  <div className="mt-8 pt-6 border-t border-slate-200/60 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400">
+                    <span>Planned Next Phase</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* VIEW 2: DIVISION PRODUCTS (FX & S)                       */}
+          {/* ======================================================== */}
+          {view === 'division' && (
+            <div className="max-w-6xl mx-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-slate-200 mb-8">
+                <div>
+                  <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                    {selectedDivision} Products
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Select an active product to launch the Roadmap Generator and Commercial Staging workspace.
+                  </p>
+                </div>
+                <div className="mt-4 sm:mt-0">
+                  <button
+                    onClick={() => setView('homepage')}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 text-slate-600 transition-colors"
+                  >
+                    &larr; Switch Division
+                  </button>
+                </div>
+              </div>
+
+              {/* 2-Row Product Grid */}
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Core Production Lines</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div
+                      onClick={() => {
+                        setSelectedProduct('CFD');
+                        setView('generator');
+                      }}
+                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-50 text-osttra-teal border border-teal-200">
+                            Active Product
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono">ID: CFD-01</span>
+                        </div>
+                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">CFD</h3>
+                        <p className="text-xs font-medium text-slate-500 mt-1">Contracts For Difference & Synthetic Equities</p>
+                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                          Automated equity swaps, corporate action adjustments, and prime broker execution feeds.
+                        </p>
+                      </div>
+                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>Last updated by: {currentUser} on 11/11/2026</span>
+                      </div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setSelectedProduct('ETD');
+                        setView('generator');
+                      }}
+                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs border-2 border-teal-100 flex flex-col justify-between ring-2 ring-teal-500/10"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-osttra-teal text-white">
+                            Primary Roadmap
+                          </span>
+                          <span className="text-xs text-teal-700 font-mono font-bold">ID: ETD-CORE</span>
+                        </div>
+                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">ETD</h3>
+                        <p className="text-xs font-medium text-slate-500 mt-1">Exchange Traded Derivatives</p>
+                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                          Clearing connectivity, SPAN margin microservices, FIX gateway feeds, and post-trade allocation.
+                        </p>
+                      </div>
+                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>Last updated by: {currentUser} on 11/11/2026</span>
+                      </div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setSelectedProduct('TRM');
+                        setView('generator');
+                      }}
+                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-50 text-osttra-teal border border-teal-200">
+                            Active Product
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono">ID: TRM-03</span>
+                        </div>
+                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">TRM</h3>
+                        <p className="text-xs font-medium text-slate-500 mt-1">Trade Reporting & Monitoring</p>
+                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                          Global multi-jurisdictional trade reporting (CFTC, EMIR, MAS, ASIC) and reconciliation dashboard.
+                        </p>
+                      </div>
+                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>Last updated by: {currentUser} on 11/11/2026</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* VIEW 3: ROADMAP GENERATOR & STAGING                      */}
+          {/* ======================================================== */}
+          {view === 'generator' && (
+            <div className="space-y-8">
+              {/* Product Header & Quarter Selection Bar */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-5 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                        {selectedProduct} - Commercial Roadmap Generator
+                      </h2>
+                      <span className="text-xs px-2 py-0.5 rounded font-semibold bg-teal-50 text-osttra-teal border border-teal-200">
+                        {selectedDivision}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Query technical PRF deliverables by quarter from your live Google Sheet, convert them to client-facing commercial value propositions, edit the text inline, and stage the timeline roadmap.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setView('division')}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 text-slate-600 transition-colors"
+                    >
+                      &larr; Products
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quarter Selection Bar */}
+                <div className="mt-5">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                    Select Target Quarters / Milestones:
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {allQuarters.map((q) => {
+                      const active = selectedQuarters.includes(q);
+                      return (
+                        <button
+                          key={q}
+                          onClick={() => toggleQuarter(q)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs border ${
+                            active
+                              ? 'bg-osttra-teal text-white border-teal-600 shadow-sm shadow-teal-500/20'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-teal-300 hover:bg-teal-50/40'
+                          }`}
+                        >
+                          [ {q} ]
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Top Action Button: [ Run ] */}
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <p className="text-xs text-slate-500">
+                      {selectedQuarters.length} quarter(s) selected: {selectedQuarters.join(', ') || 'None'}
+                    </p>
+                    <button
+                      onClick={handleFetchPrfData}
+                      disabled={table1Loading}
+                      className="px-6 py-2.5 rounded-xl text-xs font-bold bg-osttra-teal hover:bg-[#008285] text-white transition-colors shadow-sm flex items-center gap-2"
+                    >
+                      {table1Loading ? (
+                        <>
+                          <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
+                          <span>Fetching PRF Records...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>[ Run ]</span>
+                          <span>Fetch PRF Data &rarr;</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* TABLE 1: SOURCE PRF DATA */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <span>Table 1: Source PRF Data</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-semibold">
+                        {table1Data.length} records
+                      </span>
+                      {dataSourceNotice && (
+                        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          {dataSourceNotice}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Check the PRF deliverables you wish to translate into commercial roadmap staging items.
+                    </p>
+                  </div>
+
+                  {table1Data.length > 0 && (
+                    <div className="text-xs font-medium text-slate-600">
+                      {selectedTable1Ids.size} of {table1Data.length} selected
+                    </div>
+                  )}
+                </div>
+
+                {table1Data.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-sm font-medium text-slate-500">No PRF records loaded yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Select quarters above and click <strong>[ Run ]</strong> to populate Table 1.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold">
+                        <tr>
+                          <th className="py-3 px-4 w-28">Roadmap</th>
+                          <th className="py-3 px-4">Deliverable (Description)</th>
+                          <th className="py-3 px-4 w-40">Category</th>
+                          <th className="py-3 px-4 w-48">Theme</th>
+                          <th className="py-3 px-4 text-center w-48">
+                            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={table1Data.length > 0 && selectedTable1Ids.size === table1Data.length}
+                                onChange={toggleTable1SelectAll}
+                                className="rounded text-osttra-teal focus:ring-teal-400 h-4 w-4 cursor-pointer"
+                              />
+                              <span>Convert to Commercial</span>
+                            </label>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {table1Data.map((row) => {
+                          const isChecked = selectedTable1Ids.has(row.id);
+                          return (
+                            <tr key={row.id} className={isChecked ? 'bg-teal-50/20' : 'hover:bg-slate-50/50'}>
+                              <td className="py-3 px-4 font-bold text-slate-800">
+                                <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[11px]">
+                                  {row.roadmap}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 font-medium text-slate-800">
+                                <div>{row.deliverable}</div>
+                                <span className="text-[10px] text-slate-400 font-mono">{row.jiraKey}</span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                  {row.category}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-slate-600">
+                                {row.theme}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleTable1Checkbox(row.id)}
+                                  className="h-4 w-4 rounded cursor-pointer"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Table 1 Action Bar */}
+                {table1Data.length > 0 && (
+                  <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+                    <p className="text-xs text-slate-500">
+                      Select items above using checkboxes, then click [ Run ] below to translate.
+                    </p>
+                    <button
+                      onClick={handleTranslateToCommercial}
+                      disabled={table2Loading || selectedTable1Ids.size === 0}
+                      className="px-6 py-2.5 rounded-xl text-xs font-bold bg-osttra-teal hover:bg-[#008285] text-white transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {table2Loading ? (
+                        <>
+                          <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
+                          <span>Translating Deliverables...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>[ Run ]</span>
+                          <span>Translate & Populate Table 2 &rarr;</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* TABLE 2: COMMERCIAL ROADMAP STAGING (WITH INLINE EDITING!) */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <span>Table 2: Commercial Roadmap Staging</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-semibold">
+                        {table2Data.length} staged
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Review and directly edit translated text, categories, or quarters below before promoting to the timeline.
+                    </p>
+                  </div>
+
+                  {table2Data.length > 0 && (
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => handleSyncToJira()}
+                        disabled={jiraSyncing || selectedTable2Ids.size === 0}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs flex items-center gap-1.5"
+                      >
+                        {jiraSyncing ? 'Syncing...' : 'Sync Selected to Jira'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {table2Data.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-sm font-medium text-slate-500">Staging area is empty.</p>
+                    <p className="text-xs text-slate-400 mt-1">Select items in Table 1 and click <strong>[ Run ]</strong> beneath it to generate commercial staging data.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold">
+                        <tr>
+                          <th className="py-3 px-4 w-28">Roadmap</th>
+                          <th className="py-3 px-4">Commercial Deliverable (Click to Edit ✏️)</th>
+                          <th className="py-3 px-4 w-48">Commercial Category</th>
+                          <th className="py-3 px-4 w-40">Theme</th>
+                          <th className="py-3 px-4 text-center w-36">Sync to JIRA</th>
+                          <th className="py-3 px-4 text-center w-36">
+                            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={table2Data.length > 0 && selectedTable2Ids.size === table2Data.length}
+                                onChange={toggleTable2SelectAll}
+                                className="rounded text-osttra-teal focus:ring-teal-400 h-4 w-4 cursor-pointer"
+                              />
+                              <span>Promote</span>
+                            </label>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {table2Data.map((row) => {
+                          const isPromoted = selectedTable2Ids.has(row.id);
+                          const isSynced = row.jiraStatus === 'Synced';
+                          const isEditing = editingStagingRowId === row.id;
+
+                          return (
+                            <tr key={row.id} className={isPromoted ? 'bg-teal-50/20' : 'hover:bg-slate-50/50'}>
+                              {/* Quarter / Roadmap Column with dropdown */}
+                              <td className="py-3 px-4 font-bold text-slate-800">
+                                <select
+                                  value={row.roadmap}
+                                  onChange={(e) => updateStagedItem(row.id, 'roadmap', e.target.value)}
+                                  className="px-2 py-1 rounded bg-teal-50 text-osttra-teal border border-teal-200 font-mono text-[11px] font-bold cursor-pointer outline-none focus:ring-1 focus:ring-teal-500"
+                                >
+                                  {STANDARD_QUARTERS.map((q) => (
+                                    <option key={q} value={q}>{q}</option>
+                                  ))}
+                                </select>
+                              </td>
+
+                              {/* Editable Commercial Deliverable */}
+                              <td className="py-3 px-4">
+                                {isEditing ? (
+                                  <div className="space-y-1.5">
+                                    <textarea
+                                      value={row.deliverable}
+                                      onChange={(e) => updateStagedItem(row.id, 'deliverable', e.target.value)}
+                                      rows={2}
+                                      className="w-full text-xs font-semibold p-2 bg-white border-2 border-osttra-teal rounded-lg outline-none"
+                                      autoFocus
+                                    />
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingStagingRowId(null)}
+                                        className="text-[10px] font-bold bg-osttra-teal text-white px-2.5 py-0.5 rounded shadow-2xs"
+                                      >
+                                        Done ✓
+                                      </button>
+                                      <span className="text-[10px] text-slate-400">Editing text</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div 
+                                    onClick={() => setEditingStagingRowId(row.id)}
+                                    className="cursor-pointer group flex items-start justify-between gap-2"
+                                    title="Click to edit text"
+                                  >
+                                    <div>
+                                      <div className="font-semibold text-slate-900 group-hover:text-osttra-teal transition-colors">
+                                        {row.deliverable}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5 italic line-through">
+                                        {row.originalDeliverable}
+                                      </div>
+                                    </div>
+                                    <span className="opacity-0 group-hover:opacity-100 text-xs text-slate-400 hover:text-osttra-teal p-1 shrink-0">
+                                      ✏️
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Commercial Category Dropdown */}
+                              <td className="py-3 px-4">
+                                <select
+                                  value={row.category}
+                                  onChange={(e) => updateStagedItem(row.id, 'category', e.target.value)}
+                                  className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-slate-700 outline-none cursor-pointer"
+                                >
+                                  <option value="Strategic">Strategic</option>
+                                  <option value="Regulatory">Regulatory</option>
+                                  <option value="Performance & Scalability">Performance & Scalability</option>
+                                  <option value="Client Partnership">Client Partnership</option>
+                                  <option value="Platform Resilience">Platform Resilience</option>
+                                  <option value="Operational Excellence">Operational Excellence</option>
+                                  <option value="Market Expansion">Market Expansion</option>
+                                  <option value="Risk Management">Risk Management</option>
+                                </select>
+                              </td>
+
+                              {/* Strategic Theme Select (Approach B: Interactive Staging Dropdown) */}
+                              <td className="py-3 px-4">
+                                <select
+                                  value={row.theme || 'Functional & Usability'}
+                                  onChange={(e) => updateStagedItem(row.id, 'theme', e.target.value)}
+                                  className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 hover:border-slate-300 focus:border-osttra-teal rounded-lg px-2 py-1.5 outline-none shadow-2xs transition-colors cursor-pointer"
+                                >
+                                  <option value="Platform Enhancements">Platform Enhancements</option>
+                                  <option value="Functional & Usability">Functional & Usability</option>
+                                  <option value="Connectivity & Coverage">Connectivity & Coverage</option>
+                                </select>
+                              </td>
+
+                              {/* Sync to Jira */}
+                              <td className="py-3 px-4 text-center">
+                                {isSynced ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                    Synced
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleSyncToJira(row.id)}
+                                    className="px-2 py-1 rounded text-[11px] font-semibold bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-osttra-teal border border-slate-200 transition-colors"
+                                  >
+                                    Sync
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Promote Checkbox */}
+                              <td className="py-3 px-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isPromoted}
+                                  onChange={() => toggleTable2Checkbox(row.id)}
+                                  className="h-4 w-4 rounded cursor-pointer"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Final Action Bar */}
+                {table2Data.length > 0 && (
+                  <div className="p-5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <p className="text-xs text-slate-500">
+                      {selectedTable2Ids.size} of {table2Data.length} items selected to render on the official timeline.
+                    </p>
+                    <button
+                      onClick={handleProduceRoadmap}
+                      disabled={selectedTable2Ids.size === 0}
+                      className="px-8 py-3 rounded-xl text-sm font-extrabold bg-osttra-teal hover:bg-[#008285] text-white transition-all shadow-md shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <span>[ Produce Roadmap ]</span>
+                      <span>&rarr;</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* VIEW 4: CUSTOMER-FACING 2D MATRIX & EXECUTIVE DECK VIEW  */}
+          {/* ======================================================== */}
+          {view === 'timeline' && (
+            <div>
+              {isDeckView ? (
+                /* -------------------------------------------------- */
+                /* EXECUTIVE PRESENTATION / DECK VIEW (16:9 SLIDE)   */
+                /* -------------------------------------------------- */
+                <div className="space-y-4">
+                  {/* Presentation Top Control Bar */}
+                  <div className="bg-slate-900 text-white rounded-2xl px-6 py-3 flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                        Presentation Mode (16:9 Executive Deck Slide)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => window.print()}
+                        className="px-4 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>🖨</span> Print / Export Slide
+                      </button>
+                      <button
+                        onClick={() => setIsDeckView(false)}
+                        className="px-4 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 transition-all shadow-sm cursor-pointer"
+                      >
+                        ✕ Exit Presentation
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 16:9 Presentation Slide Canvas */}
+                  <div className="bg-slate-100 p-4 md:p-8 rounded-3xl border border-slate-300 shadow-2xl flex justify-center">
+                    <div className="w-full max-w-6xl aspect-[16/9] min-h-[640px] bg-white rounded-2xl border border-slate-200 shadow-xl p-8 flex flex-col justify-between overflow-hidden">
+                      {/* Slide Header */}
+                      <div className="border-b border-slate-200 pb-4 mb-4 flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#CA0F61]/10 text-[#CA0F61]">
+                              {selectedProduct} Strategic Roadmap
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">Customer Facing Plan</span>
+                          </div>
+                          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+                            {selectedProduct} Commercial Horizon Roadmap
+                          </h1>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-slate-600 block">OSTTRA Product Solutions</span>
+                          <span className="text-[10px] text-slate-400 font-medium">Confidential - Client Review</span>
+                        </div>
+                      </div>
+
+                      {/* Matrix Headers & Rows inside Slide */}
+                      <div className="flex-1 flex flex-col justify-around space-y-3">
+                        {/* Column Headers for 3 Time Horizons inside Slide View: 3 Separate Boxes with Continuous Flowing Gradient */}
+                        <div className="grid grid-cols-12 gap-3.5 mb-1">
+                          <div className="col-span-3"></div>
+                          <div className="col-span-9 grid grid-cols-3 gap-3.5">
+                            {TIME_HORIZONS.map((horizon) => (
+                              <div 
+                                key={horizon.key} 
+                                style={{ background: horizon.headerGradient }}
+                                className="p-3 px-3.5 rounded-xl shadow-xs text-white flex items-center justify-between"
+                              >
+                                <div>
+                                  <span className="text-sm font-black tracking-tight drop-shadow-xs">{horizon.title}</span>
+                                  <p className="text-[9px] font-medium text-white/90 drop-shadow-xs">{horizon.subtitle}</p>
+                                </div>
+                                <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-xs border border-white/25 shadow-xs whitespace-nowrap">
+                                  {horizon.tag}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 3 Enhancement Theme Rows */}
+                        {ENHANCEMENT_THEMES.map((theme) => (
+                          <ThemeMatrixRow
+                            key={theme.name}
+                            theme={theme}
+                            itemsByHorizon={matrixData[theme.name] || { now: [], next: [], later: [] }}
+                            onDropItem={handleDropItem}
+                            onCardClick={handleOpenEditModal}
+                            onRemoveItem={handleRemoveFromRoadmap}
+                            isPrint={true}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Slide Footer */}
+                      <div className="border-t border-slate-200 pt-3 mt-4 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>&copy; {new Date().getFullYear()} OSTTRA Group. All rights reserved.</span>
+                        <span>Generated via Commercial Roadmaps Portal</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* -------------------------------------------------- */
+                /* STANDARD INTERACTIVE 2D MATRIX VIEW               */
+                /* -------------------------------------------------- */
+                <div className="space-y-6">
+                  {/* Header Action Bar */}
+                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                          {selectedProduct} Customer-Facing Roadmap
+                        </h2>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-50 text-osttra-teal border border-teal-200">
+                          Now / Next / Later
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Drag & Drop deliverables across horizons and enhancement themes &bull; Click card to edit commercial text
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-3 flex-wrap gap-2">
+                      <button
+                        onClick={() => setView('generator')}
+                        className="px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
+                      >
+                        &larr; Back to Staging
+                      </button>
+                      <button
+                        onClick={() => setIsDeckView(true)}
+                        className="px-4 py-2 rounded-xl text-xs font-bold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <span>📽</span> Deck / Slide View
+                      </button>
+                      <button
+                        onClick={() => window.print()}
+                        className="px-4 py-2 rounded-xl text-xs font-bold bg-osttra-teal hover:bg-[#008285] text-white transition-colors shadow-2xs cursor-pointer"
+                      >
+                        Export / Print
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filter Toolbar */}
+                  <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <div className="relative w-full sm:w-64">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">🔍</span>
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search deliverables, themes..."
+                          className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-osttra-teal outline-none text-xs"
+                        />
+                      </div>
+
+                      <select
+                        value={selectedThemeFilter}
+                        onChange={(e) => setSelectedThemeFilter(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none cursor-pointer"
+                      >
+                        <option value="ALL">All Themes</option>
+                        {ENHANCEMENT_THEMES.map((th) => (
+                          <option key={th.name} value={th.name}>{th.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="text-xs text-slate-400 font-medium">
+                      Tip: Drag any card to move it into another horizon or theme.
+                    </div>
+                  </div>
+
+                  {/* 2D Matrix Grid: 3 Enhancement Themes x 3 Time Horizons */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 overflow-x-auto">
+                    <div className="min-w-[900px] space-y-4">
+                      {/* Column Headers for 3 Time Horizons: 3 Separate Boxes with Continuous Flowing Gradient */}
+                      <div className="grid grid-cols-12 gap-3.5 mb-1">
+                        <div className="hidden md:block md:col-span-3"></div>
+                        <div className="col-span-12 md:col-span-9 grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                          {TIME_HORIZONS.map((horizon) => (
+                            <div 
+                              key={horizon.key} 
+                              style={{ background: horizon.headerGradient }}
+                              className="p-3.5 px-4 rounded-xl shadow-xs text-white flex items-center justify-between"
+                            >
+                              <div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-base font-black tracking-tight drop-shadow-xs">{horizon.title}</span>
+                                  <span className="text-[10px] font-semibold text-white/90 drop-shadow-xs">{horizon.subtitle}</span>
+                                </div>
+                              </div>
+                              <span className="text-[8px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/20 text-white backdrop-blur-xs border border-white/25 shadow-xs whitespace-nowrap">
+                                {horizon.tag}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 3 Enhancement Theme Rows */}
+                      <div className="space-y-4">
+                        {ENHANCEMENT_THEMES.map((theme) => (
+                          <ThemeMatrixRow
+                            key={theme.name}
+                            theme={theme}
+                            itemsByHorizon={matrixData[theme.name] || { now: [], next: [], later: [] }}
+                            onDropItem={handleDropItem}
+                            onCardClick={handleOpenEditModal}
+                            onRemoveItem={handleRemoveFromRoadmap}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Interactive Card Edit Modal */}
+          <EditCardModal
+            item={modalItem}
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            onSave={handleSaveModalItem}
+            onRemove={handleRemoveFromRoadmap}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Mount the React Application
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<CommercialApp />);
+</script>
