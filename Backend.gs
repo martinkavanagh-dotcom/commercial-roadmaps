@@ -4,7 +4,7 @@
  */
 
 const SCRIPT_PROP_SPREADSHEET_ID_KEY = 'COMMERCIAL_ROADMAP_SPREADSHEET_ID';
-const DEFAULT_SPREADSHEET_ID = '1y0HAQ9GFqDKigJtHWugH0mf2fRURLRclwJ_viLEPn1Y';
+const ACTIVE_SPREADSHEET_ID = '1y0HAQ9GFqDKigJtHWugH0mf2fRURLRclwJ_viLEPn1Y';
 const TARGET_SHEET_GID = 241981718;
 const PRIMARY_SHEET_NAME = 'PRF Import';
 const BACKUP_SHEET_NAME = 'Roadmap Data';
@@ -12,19 +12,24 @@ const LEGACY_SHEET_NAME = 'Jira Data';
 const PRODUCED_SHEET_NAME = 'Commercial Roadmap Output';
 
 /**
- * Returns the currently active spreadsheet ID from ScriptProperties, with graceful fallback to the live sheet.
+ * Returns the currently active spreadsheet ID.
+ * Strictly guarantees connection to the new spreadsheet (1y0HAQ9GFqDKigJtHWugH0mf2fRURLRclwJ_viLEPn1Y),
+ * permanently decoupling from any legacy sheet references.
  */
 function getSpreadsheetId_() {
   try {
     const props = PropertiesService.getScriptProperties();
     const id = props.getProperty(SCRIPT_PROP_SPREADSHEET_ID_KEY);
-    if (id && id.trim().length > 0) {
-      return id.trim();
+    // If not set or if pointing to legacy sheet, update and lock to active new sheet
+    if (!id || id.indexOf('1WPvbk') !== -1 || id.trim().length === 0) {
+      props.setProperty(SCRIPT_PROP_SPREADSHEET_ID_KEY, ACTIVE_SPREADSHEET_ID);
+      return ACTIVE_SPREADSHEET_ID;
     }
+    return id.trim();
   } catch (e) {
     console.warn('ScriptProperties lookup notice:', e.message);
   }
-  return DEFAULT_SPREADSHEET_ID;
+  return ACTIVE_SPREADSHEET_ID;
 }
 
 /**
@@ -349,7 +354,7 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
   if (translatedIdx === -1 && headers.length >= 14) {
     translatedIdx = 13; // Column N
   }
-  const productIdx = findColIndex([/^teams?(\s*name)?$/i, /^product$/i, /^component/i, /^project$/i]);
+  const teamIdx = findColIndex([/^teams?$/i, /^team\s*name$/i, /^jira\s*team$/i, /^product$/i, /^component/i, /^project$/i]);
   const quarterIdx = findColIndex([/^quarter/i, /^fix\s*version/i, /^roadmap/i, /^horizon/i, /^due\s*date$/i, /^due/i]);
   const categoryIdx = findColIndex([/^category$/i, /^issue\s*type$/i, /^type$/i, /^request\s*status$/i]);
   const statusIdx = findColIndex([/^status$/i]);
@@ -362,18 +367,29 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
     });
   }
 
+  const isCfmTarget = targetProduct && (
+    targetProduct.toUpperCase() === 'CFM' ||
+    targetProduct.toUpperCase().indexOf('CASH') !== -1 ||
+    targetProduct.toUpperCase().indexOf('FLOW') !== -1
+  );
+
   const items = [];
 
   for (let r = 1; r < data.length; r++) {
     const row = data[r];
 
-    // If product column is absent in sheet, default to CFM (or active filter)
-    const rowProduct = (productIdx !== -1 && row[productIdx])
-      ? String(row[productIdx]).trim()
-      : (targetProduct || 'CFM');
+    const rowTeam = (teamIdx !== -1 && row[teamIdx]) ? String(row[teamIdx]).trim() : '';
+    const jiraKey = jiraKeyIdx !== -1 ? String(row[jiraKeyIdx] || '').trim() : '';
 
-    if (targetProduct && !matchProduct_(rowProduct, targetProduct)) {
-      continue;
+    // If target product is CFM/Cashflows, strictly filter for Cashflows teams
+    if (isCfmTarget) {
+      if (!isCashflowProduct_(rowTeam, jiraKey)) {
+        continue; // Strictly filter out non-Cashflow rows!
+      }
+    } else if (targetProduct && targetProduct.toUpperCase() !== 'ALL') {
+      if (!matchProduct_(rowTeam, targetProduct)) {
+        continue;
+      }
     }
 
     const rawQuarter = quarterIdx !== -1 ? row[quarterIdx] : 'BL';
@@ -388,7 +404,6 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
     const rawDesc = descIdx !== -1 ? String(row[descIdx] || '').trim() : '';
     const deliverable = rawTitle || rawDesc || ('Deliverable Row #' + (r + 1));
 
-    const jiraKey = jiraKeyIdx !== -1 ? String(row[jiraKeyIdx] || '').trim() : '';
     const itemId = (idIdx !== -1 && row[idIdx]) ? String(row[idIdx]) : (jiraKey || ('PRF-' + r));
     const translated = translatedIdx !== -1 ? String(row[translatedIdx] || '').trim() : '';
     const category = categoryIdx !== -1 ? (String(row[categoryIdx] || '').trim() || 'Strategic') : 'Strategic';
@@ -397,7 +412,8 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
 
     items.push({
       id: itemId,
-      product: rowProduct,
+      team: rowTeam || (isCfmTarget ? 'Cashflows' : targetProduct),
+      product: rowTeam || targetProduct,
       roadmap: normQuarter,
       deliverable: deliverable,
       description: rawDesc,
@@ -407,7 +423,7 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
       status: status,
       jiraKey: jiraKey || itemId,
       rowIndex: r + 1,
-      source: 'GoogleSheet'
+      source: 'Live Sheet (' + (sheet.getName() || 'PRF Import') + ')'
     });
   }
 
@@ -676,6 +692,7 @@ function transformPrfToCommercial_(item) {
     return {
       id: 'STG-' + item.id,
       sourcePrfId: item.id,
+      team: item.team || item.product || 'Cashflows',
       product: item.product,
       roadmap: item.roadmap,
       deliverable: cleanCommercialHeadline_(item.translatedDeliverable),
@@ -734,6 +751,7 @@ function transformPrfToCommercial_(item) {
   return {
     id: 'STG-' + item.id,
     sourcePrfId: item.id,
+    team: item.team || item.product || 'Cashflows',
     product: item.product,
     roadmap: item.roadmap,
     deliverable: commercialTitle,
@@ -1017,7 +1035,7 @@ function autoTranslateNewPrfRows() {
 
   const titleCol = findCol([/^summary$/i, /^title$/i, /^deliverable/i, /^feature$/i]);
   const descCol = findCol([/^description$/i, /^idea\s*description$/i, /^jira\s*description$/i]);
-  const prodCol = findCol([/^teams?(\s*name)?$/i, /^product$/i, /^component/i, /^project$/i]);
+  const prodCol = findCol([/^teams?$/i, /^team\s*name$/i, /^jira\s*team$/i, /^product$/i, /^component/i, /^project$/i]);
   const keyCol = findCol([/^issue\s*key$/i, /^key$/i, /^jira\s*key$/i]);
   const quarterCol = findCol([/^quarter/i, /^fix\s*version/i, /^roadmap/i, /^horizon/i, /^due\s*date$/i, /^due/i]);
   const catCol = findCol([/^category$/i, /^issue\s*type$/i, /^type$/i, /^request\s*status$/i]);
@@ -1079,8 +1097,8 @@ function autoTranslateNewPrfRows() {
       const deliverable = summary || desc;
 
       if (deliverable) {
-        const prod = prodCol !== -1 && row[prodCol] ? String(row[prodCol]).trim() : '';
-        const jiraKey = keyCol !== -1 && row[keyCol] ? String(row[keyCol]).trim() : '';
+        const prod = prodCol !== -1 ? String(row[prodCol] || '').trim() : '';
+        const jiraKey = keyCol !== -1 ? String(row[keyCol] || '').trim() : '';
 
         // Only translate Cash Flow Management (CFM) records; skip other products until their domain markdown context is added
         if (!isCashflowProduct_(prod, jiraKey)) {
@@ -1091,6 +1109,7 @@ function autoTranslateNewPrfRows() {
         const item = {
           id: jiraKey || ('ROW-' + (r + 1)),
           jiraKey: jiraKey,
+          team: prod || 'Cashflows',
           product: prod || 'CFM',
           roadmap: quarterCol !== -1 && row[quarterCol] ? normalizeQuarter_(row[quarterCol]) : 'BL',
           category: catCol !== -1 && row[catCol] ? String(row[catCol]).trim() : 'Strategic',

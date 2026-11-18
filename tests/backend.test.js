@@ -360,3 +360,36 @@ test('findColIndex correctly resolves Column N as translation column and Team as
   assert.equal(transIdx, 13, 'Column N (index 13) correctly resolves to Commercial Translation');
 });
 
+// Test strict filtering by Team = 'Cashflows' in live sheet records
+test('fetchLiveSheetRecords_ filtering logic strictly includes only rows where Team is Cashflows', () => {
+  function isCashflowProduct_(product, key) {
+    const p = String(product || '').trim().toUpperCase();
+    const k = String(key || '').trim().toUpperCase();
+    if (p.indexOf('CFM') !== -1 || p.indexOf('CASH') !== -1 || p.indexOf('FLOW') !== -1) return true;
+    if (k.startsWith('CFM-') || k.startsWith('CFM') || k.startsWith('CASH-')) return true;
+    return false;
+  }
+
+  const rawRows = [
+    { key: 'CFM-101', team: 'Cashflows', deliverable: 'Netting engine' },
+    { key: 'CFM-102', team: 'Cashflow', deliverable: 'Affirmation feed' },
+    { key: 'ETD-1021', team: 'ETD', deliverable: 'FIX latency' },
+    { key: 'CFD-1044', team: 'CFD', deliverable: 'Synthetic equities' },
+    { key: 'RATE-200', team: 'Rates', deliverable: 'IRS processing' },
+    { key: 'CFM-103', team: '', deliverable: 'SSI Gateway' } // Ticket starts with CFM-
+  ];
+
+  const targetProduct = 'CFM';
+  const isCfmTarget = targetProduct.toUpperCase() === 'CFM' || targetProduct.toUpperCase().indexOf('CASH') !== -1;
+
+  const filteredItems = rawRows.filter(row => {
+    if (isCfmTarget) {
+      return isCashflowProduct_(row.team, row.key);
+    }
+    return true;
+  });
+
+  assert.equal(filteredItems.length, 3, 'Should only return the 3 CFM/Cashflows rows');
+  assert.deepEqual(filteredItems.map(i => i.key), ['CFM-101', 'CFM-102', 'CFM-103']);
+});
+

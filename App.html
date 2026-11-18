@@ -1037,6 +1037,7 @@
             return {
               id: 'STG-' + item.id,
               sourcePrfId: item.id,
+              team: item.team || item.product || 'Cashflows',
               product: item.product,
               roadmap: item.roadmap,
               deliverable: commercialTitle,
@@ -1739,10 +1740,11 @@
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold">
                         <tr>
-                          <th className="py-3 px-4 w-28">Roadmap</th>
+                          <th className="py-3 px-4 w-24">Roadmap</th>
+                          <th className="py-3 px-4 w-28">Team</th>
                           <th className="py-3 px-4">Deliverable (Description)</th>
-                          <th className="py-3 px-4 w-40">Category</th>
-                          <th className="py-3 px-4 w-48">Theme</th>
+                          <th className="py-3 px-4 w-36">Category</th>
+                          <th className="py-3 px-4 w-44">Theme</th>
                           <th className="py-3 px-4 text-center w-48">
                             <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                               <input
@@ -1764,6 +1766,11 @@
                               <td className="py-3 px-4 font-bold text-slate-800">
                                 <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[11px]">
                                   {row.roadmap}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-osttra-teal border border-teal-200">
+                                  {row.team || row.product || 'Cashflows'}
                                 </span>
                               </td>
                               <td className="py-3 px-4 font-medium text-slate-800">
@@ -1859,12 +1866,13 @@
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold">
                         <tr>
-                          <th className="py-3 px-4 w-28">Roadmap</th>
+                          <th className="py-3 px-4 w-24">Roadmap</th>
+                          <th className="py-3 px-4 w-28">Team</th>
                           <th className="py-3 px-4">Commercial Deliverable (Click to Edit ✏️)</th>
-                          <th className="py-3 px-4 w-48">Commercial Category</th>
-                          <th className="py-3 px-4 w-40">Theme</th>
-                          <th className="py-3 px-4 text-center w-36">Sync to JIRA</th>
-                          <th className="py-3 px-4 text-center w-36">
+                          <th className="py-3 px-4 w-44">Commercial Category</th>
+                          <th className="py-3 px-4 w-36">Theme</th>
+                          <th className="py-3 px-4 text-center w-32">Sync to JIRA</th>
+                          <th className="py-3 px-4 text-center w-32">
                             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
                               <input
                                 type="checkbox"
@@ -1896,6 +1904,13 @@
                                     <option key={q} value={q}>{q}</option>
                                   ))}
                                 </select>
+                              </td>
+
+                              {/* Team Column */}
+                              <td className="py-3 px-4">
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-osttra-teal border border-teal-200">
+                                  {row.team || row.product || 'Cashflows'}
+                                </span>
                               </td>
 
                               {/* Editable Commercial Deliverable */}
