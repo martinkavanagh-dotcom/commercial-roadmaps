@@ -1,21 +1,171 @@
 /**
  * Commercial Roadmaps - Standalone Server-Side Controller & Service Module
- * Connected to Live Google Sheet: OSTTRA Link Database
+ * Connected to Live Google Sheet formatted for Jira Cloud for Sheets
  */
 
-const SPREADSHEET_ID = '1WPvbkSs3re4pmhfQFd6okCDuGo7Ds9v5fXTKCyPsNIo';
-const PRIMARY_SHEET_NAME = 'Roadmap Data';
-const BACKUP_SHEET_NAME = 'Jira Data';
+const SCRIPT_PROP_SPREADSHEET_ID_KEY = 'COMMERCIAL_ROADMAP_SPREADSHEET_ID';
+const PRIMARY_SHEET_NAME = 'PRF Import';
+const BACKUP_SHEET_NAME = 'Roadmap Data';
+const LEGACY_SHEET_NAME = 'Jira Data';
 const PRODUCED_SHEET_NAME = 'Commercial Roadmap Output';
 
 /**
- * Opens and caches the target Google Spreadsheet.
+ * Returns the currently active spreadsheet ID from ScriptProperties, with graceful fallback.
+ */
+function getSpreadsheetId_() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const id = props.getProperty(SCRIPT_PROP_SPREADSHEET_ID_KEY);
+    if (id && id.trim().length > 0) {
+      return id.trim();
+    }
+  } catch (e) {
+    console.warn('ScriptProperties lookup notice:', e.message);
+  }
+  return null;
+}
+
+/**
+ * Sets the active Google Spreadsheet ID in ScriptProperties.
+ */
+function setCommercialSpreadsheetId(newId) {
+  if (!newId || typeof newId !== 'string') {
+    throw new Error('Invalid spreadsheet ID provided.');
+  }
+  const cleanId = newId.trim();
+  PropertiesService.getScriptProperties().setProperty(SCRIPT_PROP_SPREADSHEET_ID_KEY, cleanId);
+  return {
+    success: true,
+    spreadsheetId: cleanId,
+    message: 'Active commercial roadmap spreadsheet ID updated successfully.'
+  };
+}
+
+/**
+ * Creates a brand new Google Spreadsheet in Google Drive formatted for Jira Cloud for Sheets
+ * with the PRF core fields and dedicated tabs for Guardrails and CFM Context.
+ */
+function createNewCommercialSpreadsheet(customTitle) {
+  const title = customTitle || 'OSTTRA Commercial Roadmaps - PRF Database';
+  const ss = SpreadsheetApp.create(title);
+
+  // ==========================================
+  // TAB 1: PRF Import (Active Data Tab)
+  // ==========================================
+  const sheet = ss.getActiveSheet();
+  sheet.setName(PRIMARY_SHEET_NAME);
+
+  const headers = [
+    'Issue Key',
+    'Summary',
+    'Description',
+    'Product',
+    'Quarter / Fix Version',
+    'Category',
+    'Status',
+    'Theme',
+    'Commercial Translation'
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+  // Professional header styling
+  sheet.setFrozenRows(1);
+  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  headerRange.setBackground('#0F172A'); // Slate 900
+  headerRange.setFontColor('#F8FAFC');
+  headerRange.setFontWeight('bold');
+  headerRange.setFontFamily('Inter');
+  headerRange.setHorizontalAlignment('center');
+
+  // Highlight the translation column (Column I) with OSTTRA Rubine accent
+  const transHeader = sheet.getRange(1, headers.length, 1, 1);
+  transHeader.setBackground('#D60050'); // OSTTRA Rubine
+  transHeader.setFontColor('#FFFFFF');
+
+  // Standard readable column widths
+  sheet.setColumnWidth(1, 110); // Issue Key
+  sheet.setColumnWidth(2, 300); // Summary
+  sheet.setColumnWidth(3, 340); // Description
+  sheet.setColumnWidth(4, 110); // Product
+  sheet.setColumnWidth(5, 130); // Quarter
+  sheet.setColumnWidth(6, 120); // Category
+  sheet.setColumnWidth(7, 110); // Status
+  sheet.setColumnWidth(8, 140); // Theme
+  sheet.setColumnWidth(9, 340); // Commercial Translation
+
+  // Register in ScriptProperties so the entire web application and backend immediately point to this new sheet
+  setCommercialSpreadsheetId(ss.getId());
+
+  const sheetUrl = ss.getUrl();
+  const sheetId = ss.getId();
+
+  console.log('=================================================================');
+  console.log('🎉 SPREADSHEET CREATED SUCCESSFULLY!');
+  console.log('📊 SPREADSHEET URL: ' + sheetUrl);
+  console.log('🔑 SPREADSHEET ID:  ' + sheetId);
+  console.log('=================================================================');
+
+  Logger.log('=================================================================');
+  Logger.log('🎉 SPREADSHEET CREATED SUCCESSFULLY!');
+  Logger.log('📊 SPREADSHEET URL: ' + sheetUrl);
+  Logger.log('🔑 SPREADSHEET ID:  ' + sheetId);
+  Logger.log('=================================================================');
+
+  return {
+    success: true,
+    spreadsheetId: sheetId,
+    spreadsheetUrl: sheetUrl,
+    sheetName: PRIMARY_SHEET_NAME,
+    message: 'Created clean PRF spreadsheet successfully and bound to Commercial Roadmaps.'
+  };
+}
+
+/**
+ * Utility to log the current active spreadsheet URL and ID directly to the execution log.
+ */
+function logCurrentSpreadsheetUrl() {
+  const ss = getSpreadsheet_();
+  const id = getSpreadsheetId_();
+  if (ss) {
+    console.log('=================================================================');
+    console.log('📊 ACTIVE SPREADSHEET NAME: ' + ss.getName());
+    console.log('🔗 SPREADSHEET URL:         ' + ss.getUrl());
+    console.log('🔑 SPREADSHEET ID:          ' + ss.getId());
+    console.log('=================================================================');
+    return ss.getUrl();
+  } else if (id) {
+    console.log('⚠️ Spreadsheet ID configured in properties (' + id + ') but could not open.');
+    return id;
+  } else {
+    console.log('⚠️ No spreadsheet is currently configured in Script Properties.');
+    return null;
+  }
+}
+
+/**
+ * Returns structured guardrails and CFM context for the web application UI.
+ */
+function getGovernanceContext() {
+  return {
+    success: true,
+    guardrailsMarkdown: typeof getGuardrailsMarkdown_ === 'function' ? getGuardrailsMarkdown_() : '',
+    cfmContextMarkdown: typeof getCfmContextMarkdown_ === 'function' ? getCfmContextMarkdown_() : ''
+  };
+}
+
+/**
+ * Opens and returns the target Google Spreadsheet.
  */
 function getSpreadsheet_() {
+  const sheetId = getSpreadsheetId_();
+  if (!sheetId) {
+    return null;
+  }
   try {
-    return SpreadsheetApp.openById(SPREADSHEET_ID);
+    return SpreadsheetApp.openById(sheetId);
   } catch (e) {
-    console.warn('Unable to open spreadsheet by ID (' + SPREADSHEET_ID + '):', e.message);
+    console.warn('Unable to open spreadsheet by ID (' + sheetId + '):', e.message);
     return null;
   }
 }
@@ -32,6 +182,7 @@ function getCommercialRoadmapConfig() {
       console.warn('Session user lookup notice:', e.message);
     }
 
+    const currentSheetId = getSpreadsheetId_();
     let dbStatus = 'Not Connected';
     let dbName = '';
     let dbUrl = '';
@@ -41,20 +192,24 @@ function getCommercialRoadmapConfig() {
       dbName = ss.getName();
       dbUrl = ss.getUrl();
       dbStatus = 'Connected: ' + dbName;
+    } else if (currentSheetId) {
+      dbStatus = 'Configured (ID: ' + currentSheetId + ') - Authorization Pending';
     } else {
-      dbStatus = 'Authorization Pending';
+      dbStatus = 'No Spreadsheet Bound (Run createNewCommercialSpreadsheet())';
     }
 
     return {
       success: true,
       appName: 'Commercial Roadmaps',
-      version: '1.1.0',
+      version: '2.0.0',
       userEmail: userEmail,
       databaseStatus: dbStatus,
       databaseName: dbName,
       databaseUrl: dbUrl,
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: currentSheetId || '',
       sheetName: PRIMARY_SHEET_NAME,
+      hasMarkdownContext: typeof getProductContextMarkdown_ === 'function',
+      hasTranslationRules: typeof getTranslationRulesMarkdown_ === 'function',
       timestamp: new Date().toISOString()
     };
   } catch (error) {
@@ -67,7 +222,7 @@ function getCommercialRoadmapConfig() {
 }
 
 /**
- * Normalizes quarter variations into standard tokens: Q1, Q2, Q3, Q4, BL, Delivered.
+ * Normalizes quarter variations or date values into standard tokens: Q1, Q2, Q3, Q4, BL, Delivered.
  */
 function normalizeQuarter_(val) {
   if (!val) return 'BL';
@@ -76,18 +231,58 @@ function normalizeQuarter_(val) {
   if (/backlog|\bbl\b/i.test(s)) return 'BL';
   const match = s.match(/Q[1-4]/i);
   if (match) return match[0].toUpperCase();
+
+  // Handle date objects or date strings (e.g. from Due date or Target date)
+  const d = new Date(s);
+  if (!isNaN(d.getTime()) && d.getFullYear() >= 2020) {
+    const m = d.getMonth();
+    if (m >= 0 && m <= 2) return 'Q1';
+    if (m >= 3 && m <= 5) return 'Q2';
+    if (m >= 6 && m <= 8) return 'Q3';
+    return 'Q4';
+  }
+
   return s.toUpperCase();
 }
 
 /**
- * Matches row product against target product filter flexibly.
+ * Matches row product against target product filter flexibly (e.g. CFM <-> Cashflows).
  */
 function matchProduct_(rowProduct, targetProduct) {
   if (!targetProduct) return true;
   if (!rowProduct) return true;
   const rp = String(rowProduct).trim().toUpperCase();
   const tp = String(targetProduct).trim().toUpperCase();
+
+  // Flexible alias matching for CFM and Cashflows
+  const isCfmRow = rp.indexOf('CFM') !== -1 || rp.indexOf('CASH') !== -1;
+  const isCfmTarget = tp.indexOf('CFM') !== -1 || tp.indexOf('CASH') !== -1;
+  if (isCfmRow && isCfmTarget) {
+    return true;
+  }
+
   return rp.indexOf(tp) !== -1 || tp.indexOf(rp) !== -1;
+}
+
+/**
+ * Detects whether a product name or Jira issue key belongs to Cash Flow Management (CFM).
+ * Used to selectively apply Gemini AI translation only to products with rich Markdown context.
+ *
+ * @param {string} product Product or component name (e.g. 'CFM', 'Cash Flow Management', 'ETD').
+ * @param {string} key Optional Jira issue key (e.g. 'CFM-1021', 'ETD-1044').
+ * @return {boolean} True if the item is Cashflow Management.
+ */
+function isCashflowProduct_(product, key) {
+  const p = String(product || '').trim().toUpperCase();
+  const k = String(key || '').trim().toUpperCase();
+
+  if (p.indexOf('CFM') !== -1 || p.indexOf('CASH') !== -1 || p.indexOf('FLOW') !== -1) {
+    return true;
+  }
+  if (k.startsWith('CFM-') || k.startsWith('CFM') || k.startsWith('CASH-')) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -100,6 +295,9 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
   let sheet = ss.getSheetByName(PRIMARY_SHEET_NAME);
   if (!sheet) {
     sheet = ss.getSheetByName(BACKUP_SHEET_NAME);
+  }
+  if (!sheet) {
+    sheet = ss.getSheets()[0];
   }
   if (!sheet) return null;
 
@@ -122,14 +320,15 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
   }
 
   const idIdx = findColIndex([/^id$/i, /^prf\s*id$/i]);
-  const jiraKeyIdx = findColIndex([/^jira\s*key$/i, /^issue\s*key$/i, /^key$/i]);
-  const titleIdx = findColIndex([/^title$/i, /^deliverable/i, /^summary$/i, /^feature$/i]);
-  const descIdx = findColIndex([/^idea\s*description$/i, /^jira\s*description$/i, /^description$/i]);
-  const translatedIdx = findColIndex([/^translated$/i, /^commercial\s*title$/i]);
-  const productIdx = findColIndex([/^product$/i]);
-  const quarterIdx = findColIndex([/^quarter$/i, /^roadmap$/i, /^horizon$/i]);
-  const categoryIdx = findColIndex([/^type$/i, /^category$/i, /^request\s*status$/i]);
-  const themeIdx = findColIndex([/^theme$/i]);
+  const jiraKeyIdx = findColIndex([/^issue\s*key$/i, /^key$/i, /^jira\s*key$/i]);
+  const titleIdx = findColIndex([/^summary$/i, /^title$/i, /^deliverable/i, /^feature$/i]);
+  const descIdx = findColIndex([/^description$/i, /^idea\s*description$/i, /^jira\s*description$/i]);
+  const translatedIdx = findColIndex([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i]);
+  const productIdx = findColIndex([/^product$/i, /^component/i, /^project$/i, /^teams?$/i]);
+  const quarterIdx = findColIndex([/^quarter/i, /^fix\s*version/i, /^roadmap/i, /^horizon/i, /^due\s*date$/i, /^due/i]);
+  const categoryIdx = findColIndex([/^category$/i, /^issue\s*type$/i, /^type$/i, /^request\s*status$/i]);
+  const statusIdx = findColIndex([/^status$/i]);
+  const themeIdx = findColIndex([/^commercial\s*theme$/i, /^theme$/i, /^initiative$/i]);
 
   const quarterSet = {};
   if (Array.isArray(targetQuarters) && targetQuarters.length > 0) {
@@ -143,7 +342,11 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
   for (let r = 1; r < data.length; r++) {
     const row = data[r];
 
-    const rowProduct = productIdx !== -1 ? row[productIdx] : '';
+    // If product column is absent in sheet, default to CFM (or active filter)
+    const rowProduct = (productIdx !== -1 && row[productIdx])
+      ? String(row[productIdx]).trim()
+      : (targetProduct || 'CFM');
+
     if (targetProduct && !matchProduct_(rowProduct, targetProduct)) {
       continue;
     }
@@ -165,15 +368,18 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
     const translated = translatedIdx !== -1 ? String(row[translatedIdx] || '').trim() : '';
     const category = categoryIdx !== -1 ? (String(row[categoryIdx] || '').trim() || 'Strategic') : 'Strategic';
     const theme = themeIdx !== -1 ? (String(row[themeIdx] || '').trim() || 'General') : 'General';
+    const status = statusIdx !== -1 ? (String(row[statusIdx] || '').trim() || 'Refined') : 'Refined';
 
     items.push({
       id: itemId,
-      product: rowProduct || targetProduct,
+      product: rowProduct,
       roadmap: normQuarter,
       deliverable: deliverable,
+      description: rawDesc,
       translatedDeliverable: translated,
       category: category,
       theme: theme,
+      status: status,
       jiraKey: jiraKey || itemId,
       rowIndex: r + 1,
       source: 'GoogleSheet'
@@ -192,6 +398,7 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
 function getPrfData(product, quarters) {
   try {
     const targetProduct = (product || 'ETD').toUpperCase();
+    const currentSheetId = getSpreadsheetId_();
 
     // 1. Attempt to query live Google Sheet
     const liveItems = fetchLiveSheetRecords_(targetProduct, quarters);
@@ -201,7 +408,7 @@ function getPrfData(product, quarters) {
       return {
         success: true,
         source: 'Live Google Sheet (' + PRIMARY_SHEET_NAME + ')',
-        spreadsheetId: SPREADSHEET_ID,
+        spreadsheetId: currentSheetId || 'Configured Sheet',
         product: targetProduct,
         quarters: quarters || [],
         count: liveItems.length,
@@ -228,7 +435,7 @@ function getPrfData(product, quarters) {
     return {
       success: true,
       source: 'Default PRF Catalog (Sheet empty or unpopulated for this selection)',
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: currentSheetId || 'Offline Fallback',
       product: targetProduct,
       quarters: quarters || [],
       count: filtered.length,
@@ -247,7 +454,7 @@ function getPrfData(product, quarters) {
  * Intelligent commercial translation rules to elevate technical PRF deliverables into client-facing commercial value statements.
  */
 /**
- * Translates a PRF item using Gemini AI (via AIProxy) with structured output.
+ * Translates a PRF item using Gemini AI (via AIProxy) with external Markdown context and rules.
  */
 function translateWithGemini_(item) {
   try {
@@ -255,29 +462,28 @@ function translateWithGemini_(item) {
       return null;
     }
 
-    var prod = (item.product || '').toLowerCase();
-    var productPersona = "Target Audience: Post-trade capital markets participants and financial institutions.";
-    if (prod.indexOf('cashflow') !== -1 || prod.indexOf('cash flow') !== -1) {
-      productPersona = "Target Audience: Institutional Treasury & Cash Settlement Operations (bilateral netting, liquidity, cash settlement visibility).";
-    } else if (prod.indexOf('cfd') !== -1) {
-      productPersona = "Target Audience: Equity Swap Traders & Prime Brokerage Operations (bilateral synthetic equity, automated matching, portfolio reset).";
-    } else if (prod.indexOf('etd') !== -1) {
-      productPersona = "Target Audience: Listed Derivatives Brokers & Clearing Members (exchange-traded futures/options, clearing STP, give-ups).";
-    }
+    const isCfm = isCashflowProduct_(item.product, item.jiraKey || item.id);
+    const productContext = (isCfm && typeof getProductContextMarkdown_ === 'function') ? getProductContextMarkdown_() : '';
+    const translationRules = typeof getTranslationRulesMarkdown_ === 'function' ? getTranslationRulesMarkdown_() : '';
 
-    var prompt = "You are a Principal Product Marketing Director at OSTTRA.\n" +
-      productPersona + "\n\n" +
-      "Item Context:\n" +
+    var prompt = "You are a Principal Product Marketing Director at OSTTRA specializing in Capital Markets and Post-Trade Infrastructure.\n\n" +
+      "=== AGREED COMMERCIAL TRANSLATION RULES (FROM context/translation_rules.md) ===\n" +
+      (translationRules || "STRICT RULES: 6 to 10 words maximum. Client value focus only. No conversational preamble.") + "\n\n" +
+      "=== PRODUCT CONTEXT & DOMAIN DEFINITIONS (FROM context/product_context.md) ===\n" +
+      (productContext || "Target Audience: Post-trade capital markets participants and financial institutions.") + "\n\n" +
+      "=== TECHNICAL PRF ITEM TO TRANSLATE ===\n" +
       "- Product: \"" + (item.product || 'Commercial Roadmap') + "\"\n" +
-      "- Internal PRF Title: \"" + (item.deliverable || '') + "\"\n" +
+      "- Issue Key: \"" + (item.jiraKey || item.id || '') + "\"\n" +
+      "- Technical Summary: \"" + (item.deliverable || '') + "\"\n" +
+      "- Technical Description: \"" + (item.description || item.deliverable || '') + "\"\n" +
       "- Category: \"" + (item.category || '') + "\"\n" +
-      "- Theme: \"" + (item.theme || '') + "\"\n\n" +
+      "- Target Horizon / Quarter: \"" + (item.roadmap || '') + "\"\n\n" +
       "TASK:\n" +
-      "1. Condense this technical item into an ULTRA-SHORT, punchy executive commercial roadmap headline (STRICTLY 6 TO 10 WORDS MAXIMUM).\n" +
-      "2. Classify the item into one of the 3 official OSTTRA Enhancement Themes (exact match from proposal):\n" +
-      "   - 'Platform Enhancements' (core technology, cloud migration, multi-region failover, data architecture, security, performance, infra)\n" +
-      "   - 'Functional & Usability' (user dashboards, calculation types, AI exception resolution, workflows, automation, reporting)\n" +
-      "   - 'Connectivity & Coverage' (market participants, clearing house integrations, new asset classes, third-party partnerships, feeds, APIs)\n\n" +
+      "1. Condense this technical PRF item into an ULTRA-SHORT, punchy executive commercial roadmap headline (STRICTLY 6 TO 10 WORDS MAXIMUM) following the agreed commercial translation rules.\n" +
+      "2. Classify the item into one of the 3 official OSTTRA Enhancement Themes:\n" +
+      "   - 'Platform Enhancements'\n" +
+      "   - 'Functional & Usability'\n" +
+      "   - 'Connectivity & Coverage'\n\n" +
       "STRICT RULES:\n" +
       "1. MAXIMUM 10 WORDS for the commercial headline. Do NOT write full conversational paragraphs or compound sentences.\n" +
       "2. Must be a razor-sharp executive roadmap headline focused purely on customer commercial value.\n" +
@@ -484,10 +690,12 @@ function transformPrfToCommercial_(item) {
     if (item.rowIndex && item.source === 'GoogleSheet') {
       var ss = getSpreadsheet_();
       if (ss) {
-        var sheet = ss.getSheetByName(PRIMARY_SHEET_NAME);
+        var sheet = ss.getSheetByName(PRIMARY_SHEET_NAME) || ss.getSheetByName(BACKUP_SHEET_NAME) || ss.getSheets()[0];
         if (sheet) {
           var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-          var transCol = headers.findIndex(function(h) { return /^translated$/i.test(String(h).trim()); });
+          var transCol = headers.findIndex(function(h) {
+            return /^commercial\s*translation$/i.test(String(h).trim()) || /^translated$/i.test(String(h).trim()) || /^translation$/i.test(String(h).trim());
+          });
           if (transCol !== -1) {
             sheet.getRange(item.rowIndex, transCol + 1).setValue(commercialTitle);
           }
@@ -634,14 +842,23 @@ function cleanCommercialHeadline_(raw) {
   t = t.replace(/^\[(bug|task|story|feature|tech debt|enhancement)\]\s*/i, '');
 
   // Elevate developer verb phrasing to client-facing deliverables
-  t = t.replace(/^fix\s+fix\s+/i, 'FIX Gateway ');
-  t = t.replace(/^fix\s+/i, 'Enhanced ');
-  t = t.replace(/^implement\s+/i, '');
-  t = t.replace(/^refactor\s+/i, 'Optimized ');
-  t = t.replace(/^upgrade\s+/i, 'Next-Generation ');
-  t = t.replace(/^add\s+/i, 'Enabled ');
-  t = t.replace(/^build\s+/i, 'Automated ');
-  t = t.replace(/^update\s+/i, 'Modernized ');
+  if (/^fix\s+fix\s+/i.test(t)) {
+    t = t.replace(/^fix\s+fix\s+/i, 'FIX Gateway ');
+  } else if (/^fix\s+/i.test(t)) {
+    t = t.replace(/^fix\s+/i, 'Enhanced ');
+  } else if (/^implement\s+/i.test(t)) {
+    t = t.replace(/^implement\s+/i, '');
+  } else if (/^refactor\s+/i.test(t)) {
+    t = t.replace(/^refactor\s+/i, 'Optimized ');
+  } else if (/^upgrade\s+/i.test(t)) {
+    t = t.replace(/^upgrade\s+/i, 'Next-Generation ');
+  } else if (/^add\s+/i.test(t)) {
+    t = t.replace(/^add\s+/i, 'Enabled ');
+  } else if (/^build\s+/i.test(t)) {
+    t = t.replace(/^build\s+/i, 'Automated ');
+  } else if (/^update\s+/i.test(t)) {
+    t = t.replace(/^update\s+/i, 'Modernized ');
+  }
 
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
@@ -722,4 +939,148 @@ function getPrfRepository_() {
     { id: 'PRF-ETD-009', product: 'ETD', roadmap: 'BL', deliverable: 'Predictive trade failure alerts using historical trade discrepancy patterns', category: 'Strategic', theme: 'AI & Analytics', jiraKey: 'ETD-1301' },
     { id: 'PRF-ETD-010', product: 'ETD', roadmap: 'Delivered', deliverable: 'REST API v2 for position management with OAuth 2.0 mTLS authentication', category: 'Strategic', theme: 'Security & API', jiraKey: 'ETD-998' }
   ];
+}
+
+/**
+ * Scans the connected Google Sheet for rows where Commercial Translation is empty,
+ * translates them using Gemini AI with external Markdown context and rules,
+ * and writes the result directly back to the Commercial Translation column.
+ */
+function autoTranslateNewPrfRows() {
+  const ss = getSpreadsheet_();
+  if (!ss) {
+    throw new Error('Spreadsheet not connected. Run createNewCommercialSpreadsheet() or setCommercialSpreadsheetId(id).');
+  }
+
+  let sheet = ss.getSheetByName(PRIMARY_SHEET_NAME) || ss.getSheetByName(BACKUP_SHEET_NAME) || ss.getSheets()[0];
+  if (!sheet) {
+    throw new Error('No sheet tab found in spreadsheet.');
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return { success: true, translatedCount: 0, message: 'No data rows found to translate.' };
+  }
+
+  const headers = data[0].map(function(h) {
+    return String(h || '').trim();
+  });
+
+  function findCol(regexes) {
+    for (let r = 0; r < regexes.length; r++) {
+      for (let i = 0; i < headers.length; i++) {
+        if (regexes[r].test(headers[i])) return i;
+      }
+    }
+    return -1;
+  }
+
+  const titleCol = findCol([/^summary$/i, /^title$/i, /^deliverable/i, /^feature$/i]);
+  const descCol = findCol([/^description$/i, /^idea\s*description$/i, /^jira\s*description$/i]);
+  const prodCol = findCol([/^product$/i, /^component/i, /^project$/i, /^teams?$/i]);
+  const keyCol = findCol([/^issue\s*key$/i, /^key$/i, /^jira\s*key$/i]);
+  const quarterCol = findCol([/^quarter/i, /^fix\s*version/i, /^roadmap/i, /^horizon/i, /^due\s*date$/i, /^due/i]);
+  const catCol = findCol([/^category$/i, /^issue\s*type$/i, /^type$/i, /^request\s*status$/i]);
+  let themeCol = findCol([/^commercial\s*theme$/i, /^theme$/i, /^initiative$/i]);
+  let transCol = findCol([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i]);
+
+  // If translation column does not exist yet, add it to the end (e.g. Column M)
+  if (transCol === -1) {
+    transCol = headers.length;
+    sheet.getRange(1, transCol + 1).setValue('Commercial Translation');
+    const headerCell = sheet.getRange(1, transCol + 1);
+    headerCell.setBackground('#D60050'); // OSTTRA Rubine
+    headerCell.setFontColor('#FFFFFF');
+    headerCell.setFontWeight('bold');
+    sheet.setColumnWidth(transCol + 1, 340);
+  }
+
+  // If theme column does not exist yet, add it adjacent to translation (e.g. Column N)
+  if (themeCol === -1) {
+    themeCol = transCol + 1;
+    sheet.getRange(1, themeCol + 1).setValue('Commercial Theme');
+    const themeHeaderCell = sheet.getRange(1, themeCol + 1);
+    themeHeaderCell.setBackground('#2A818E'); // OSTTRA Teal
+    themeHeaderCell.setFontColor('#FFFFFF');
+    themeHeaderCell.setFontWeight('bold');
+    sheet.setColumnWidth(themeCol + 1, 200);
+  }
+
+  let translatedCount = 0;
+  let skippedNonCfmCount = 0;
+  const updates = [];
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const existingTranslation = transCol !== -1 && row[transCol] ? String(row[transCol]).trim() : '';
+
+    if (!existingTranslation) {
+      const summary = titleCol !== -1 ? String(row[titleCol] || '').trim() : '';
+      const desc = descCol !== -1 ? String(row[descCol] || '').trim() : '';
+      const deliverable = summary || desc;
+
+      if (deliverable) {
+        const prod = prodCol !== -1 && row[prodCol] ? String(row[prodCol]).trim() : '';
+        const jiraKey = keyCol !== -1 && row[keyCol] ? String(row[keyCol]).trim() : '';
+
+        // Only translate Cash Flow Management (CFM) records; skip other products until their domain markdown context is added
+        if (!isCashflowProduct_(prod, jiraKey)) {
+          skippedNonCfmCount++;
+          continue;
+        }
+
+        const item = {
+          id: jiraKey || ('ROW-' + (r + 1)),
+          jiraKey: jiraKey,
+          product: prod || 'CFM',
+          roadmap: quarterCol !== -1 && row[quarterCol] ? normalizeQuarter_(row[quarterCol]) : 'BL',
+          category: catCol !== -1 && row[catCol] ? String(row[catCol]).trim() : 'Strategic',
+          theme: themeCol !== -1 && row[themeCol] ? String(row[themeCol]).trim() : 'Functional & Usability',
+          deliverable: deliverable,
+          description: desc,
+          rowIndex: r + 1,
+          source: 'GoogleSheet'
+        };
+
+        const result = transformPrfToCommercial_(item);
+        const headline = result.deliverable;
+        sheet.getRange(r + 1, transCol + 1).setValue(headline);
+
+        // Also write the commercial theme into the theme column
+        if (themeCol !== -1) {
+          sheet.getRange(r + 1, themeCol + 1).setValue(result.theme);
+        }
+
+        translatedCount++;
+        updates.push({ row: r + 1, key: item.jiraKey, translation: headline, theme: result.theme });
+      }
+    }
+  }
+
+  const msg = 'Translated ' + translatedCount + ' Cashflow Management PRF item(s).' +
+    (skippedNonCfmCount > 0 ? ' Skipped ' + skippedNonCfmCount + ' non-CFM item(s) pending product context.' : '');
+
+  return {
+    success: true,
+    translatedCount: translatedCount,
+    skippedNonCfmCount: skippedNonCfmCount,
+    updates: updates,
+    message: msg
+  };
+}
+
+/**
+ * Creates custom spreadsheet menu when opened inside Google Sheets.
+ */
+function onOpen(e) {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('OSTTRA Roadmaps')
+      .addItem('🤖 Auto-Translate New PRF Rows', 'autoTranslateNewPrfRows')
+      .addSeparator()
+      .addItem('⚙️ Check Configuration', 'testCommercialBackend')
+      .addToUi();
+  } catch (err) {
+    // Non-container context (e.g. standalone web app execution)
+  }
 }

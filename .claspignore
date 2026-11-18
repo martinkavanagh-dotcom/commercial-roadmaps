@@ -1,0 +1,18 @@
+# Clasp ignore configuration
+**/**
+!appsscript.json
+!*.gs
+!*.html
+!PromptContext.gs
+!Backend.gs
+!Code.gs
+!App.html
+!Index.html
+
+# Ignore node and build scripts
+scripts/**
+context/**
+docs/**
+node_modules/**
+package*.json
+.git/**
