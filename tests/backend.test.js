@@ -316,3 +316,47 @@ test('autoTranslateNewPrfRows logic selectively translates only CFM items in mix
   assert.equal(sheetRows[4][translationColIdx], '', 'CFD row should remain untranslated');
 });
 
+// Test 14-column layout with Column N as translation column and 'Team' as product filter
+test('findColIndex correctly resolves Column N as translation column and Team as product', () => {
+  const user14Headers = [
+    'Issue Type',  // Col A (idx 0)
+    'Key',         // Col B (idx 1)
+    'Summary',     // Col C (idx 2)
+    'Description', // Col D (idx 3)
+    'Team',        // Col E (idx 4) -> 'Cashflows'
+    'Fix Version', // Col F (idx 5)
+    'Priority',    // Col G (idx 6)
+    'Status',      // Col H (idx 7)
+    'Assignee',    // Col I (idx 8)
+    'Reporter',    // Col J (idx 9)
+    'Created',     // Col K (idx 10)
+    'Updated',     // Col L (idx 11)
+    'Theme',       // Col M (idx 12)
+    'Commercial Translation' // Col N (idx 13)
+  ];
+
+  function findColIndex(regexes) {
+    for (let r = 0; r < regexes.length; r++) {
+      for (let i = 0; i < user14Headers.length; i++) {
+        if (regexes[r].test(user14Headers[i])) return i;
+      }
+    }
+    return -1;
+  }
+
+  const teamIdx = findColIndex([/^teams?(\s*name)?$/i, /^product$/i, /^component/i, /^project$/i]);
+  const keyIdx = findColIndex([/^issue\s*key$/i, /^key$/i, /^jira\s*key$/i]);
+  const titleIdx = findColIndex([/^summary$/i, /^title$/i, /^deliverable/i]);
+  const quarterIdx = findColIndex([/^quarter/i, /^fix\s*version/i, /^roadmap/i, /^horizon/i]);
+  let transIdx = findColIndex([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i, /^commercial$/i]);
+  if (transIdx === -1 && user14Headers.length >= 14) {
+    transIdx = 13;
+  }
+
+  assert.equal(teamIdx, 4, 'Team column correctly resolves to index 4');
+  assert.equal(keyIdx, 1, 'Key resolves to index 1');
+  assert.equal(titleIdx, 2, 'Summary resolves to index 2');
+  assert.equal(quarterIdx, 5, 'Fix Version resolves to index 5');
+  assert.equal(transIdx, 13, 'Column N (index 13) correctly resolves to Commercial Translation');
+});
+

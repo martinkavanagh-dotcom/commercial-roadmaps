@@ -4,13 +4,15 @@
  */
 
 const SCRIPT_PROP_SPREADSHEET_ID_KEY = 'COMMERCIAL_ROADMAP_SPREADSHEET_ID';
+const DEFAULT_SPREADSHEET_ID = '1y0HAQ9GFqDKigJtHWugH0mf2fRURLRclwJ_viLEPn1Y';
+const TARGET_SHEET_GID = 241981718;
 const PRIMARY_SHEET_NAME = 'PRF Import';
 const BACKUP_SHEET_NAME = 'Roadmap Data';
 const LEGACY_SHEET_NAME = 'Jira Data';
 const PRODUCED_SHEET_NAME = 'Commercial Roadmap Output';
 
 /**
- * Returns the currently active spreadsheet ID from ScriptProperties, with graceful fallback.
+ * Returns the currently active spreadsheet ID from ScriptProperties, with graceful fallback to the live sheet.
  */
 function getSpreadsheetId_() {
   try {
@@ -21,6 +23,20 @@ function getSpreadsheetId_() {
     }
   } catch (e) {
     console.warn('ScriptProperties lookup notice:', e.message);
+  }
+  return DEFAULT_SPREADSHEET_ID;
+}
+
+/**
+ * Locates a sheet tab by its numeric GID if available.
+ */
+function getSheetByGid_(ss, targetGid) {
+  if (!ss || !targetGid) return null;
+  const sheets = ss.getSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    if (String(sheets[i].getSheetId()) === String(targetGid)) {
+      return sheets[i];
+    }
   }
   return null;
 }
@@ -292,9 +308,15 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
   const ss = getSpreadsheet_();
   if (!ss) return null;
 
-  let sheet = ss.getSheetByName(PRIMARY_SHEET_NAME);
+  let sheet = getSheetByGid_(ss, TARGET_SHEET_GID);
+  if (!sheet) {
+    sheet = ss.getSheetByName(PRIMARY_SHEET_NAME);
+  }
   if (!sheet) {
     sheet = ss.getSheetByName(BACKUP_SHEET_NAME);
+  }
+  if (!sheet) {
+    sheet = ss.getSheetByName(LEGACY_SHEET_NAME);
   }
   if (!sheet) {
     sheet = ss.getSheets()[0];
@@ -323,8 +345,11 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
   const jiraKeyIdx = findColIndex([/^issue\s*key$/i, /^key$/i, /^jira\s*key$/i]);
   const titleIdx = findColIndex([/^summary$/i, /^title$/i, /^deliverable/i, /^feature$/i]);
   const descIdx = findColIndex([/^description$/i, /^idea\s*description$/i, /^jira\s*description$/i]);
-  const translatedIdx = findColIndex([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i]);
-  const productIdx = findColIndex([/^product$/i, /^component/i, /^project$/i, /^teams?$/i]);
+  let translatedIdx = findColIndex([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i, /^commercial$/i]);
+  if (translatedIdx === -1 && headers.length >= 14) {
+    translatedIdx = 13; // Column N
+  }
+  const productIdx = findColIndex([/^teams?(\s*name)?$/i, /^product$/i, /^component/i, /^project$/i]);
   const quarterIdx = findColIndex([/^quarter/i, /^fix\s*version/i, /^roadmap/i, /^horizon/i, /^due\s*date$/i, /^due/i]);
   const categoryIdx = findColIndex([/^category$/i, /^issue\s*type$/i, /^type$/i, /^request\s*status$/i]);
   const statusIdx = findColIndex([/^status$/i]);
@@ -952,7 +977,12 @@ function autoTranslateNewPrfRows() {
     throw new Error('Spreadsheet not connected. Run createNewCommercialSpreadsheet() or setCommercialSpreadsheetId(id).');
   }
 
-  let sheet = ss.getSheetByName(PRIMARY_SHEET_NAME) || ss.getSheetByName(BACKUP_SHEET_NAME) || ss.getSheets()[0];
+  let sheet = getSheetByGid_(ss, TARGET_SHEET_GID) ||
+    ss.getSheetByName(PRIMARY_SHEET_NAME) ||
+    ss.getSheetByName(BACKUP_SHEET_NAME) ||
+    ss.getSheetByName(LEGACY_SHEET_NAME) ||
+    ss.getSheets()[0];
+
   if (!sheet) {
     throw new Error('No sheet tab found in spreadsheet.');
   }
@@ -977,14 +1007,19 @@ function autoTranslateNewPrfRows() {
 
   const titleCol = findCol([/^summary$/i, /^title$/i, /^deliverable/i, /^feature$/i]);
   const descCol = findCol([/^description$/i, /^idea\s*description$/i, /^jira\s*description$/i]);
-  const prodCol = findCol([/^product$/i, /^component/i, /^project$/i, /^teams?$/i]);
+  const prodCol = findCol([/^teams?(\s*name)?$/i, /^product$/i, /^component/i, /^project$/i]);
   const keyCol = findCol([/^issue\s*key$/i, /^key$/i, /^jira\s*key$/i]);
   const quarterCol = findCol([/^quarter/i, /^fix\s*version/i, /^roadmap/i, /^horizon/i, /^due\s*date$/i, /^due/i]);
   const catCol = findCol([/^category$/i, /^issue\s*type$/i, /^type$/i, /^request\s*status$/i]);
   let themeCol = findCol([/^commercial\s*theme$/i, /^theme$/i, /^initiative$/i]);
-  let transCol = findCol([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i]);
+  let transCol = findCol([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i, /^commercial$/i]);
 
-  // If translation column does not exist yet, add it to the end (e.g. Column M)
+  // If translation column not found by header name, but Column N (index 13) exists, target Column N
+  if (transCol === -1 && headers.length >= 14) {
+    transCol = 13;
+  }
+
+  // If translation column does not exist yet at all, add it to the end
   if (transCol === -1) {
     transCol = headers.length;
     sheet.getRange(1, transCol + 1).setValue('Commercial Translation');
@@ -993,9 +1028,16 @@ function autoTranslateNewPrfRows() {
     headerCell.setFontColor('#FFFFFF');
     headerCell.setFontWeight('bold');
     sheet.setColumnWidth(transCol + 1, 340);
+  } else if (!headers[transCol] || headers[transCol].trim().length === 0) {
+    // If the header cell in Column N was blank, set the header name
+    sheet.getRange(1, transCol + 1).setValue('Commercial Translation');
+    const headerCell = sheet.getRange(1, transCol + 1);
+    headerCell.setBackground('#D60050');
+    headerCell.setFontColor('#FFFFFF');
+    headerCell.setFontWeight('bold');
   }
 
-  // If theme column does not exist yet, add it adjacent to translation (e.g. Column N)
+  // If theme column does not exist yet, add it adjacent to translation (e.g. Column O)
   if (themeCol === -1) {
     themeCol = transCol + 1;
     sheet.getRange(1, themeCol + 1).setValue('Commercial Theme');
@@ -1005,6 +1047,13 @@ function autoTranslateNewPrfRows() {
     themeHeaderCell.setFontWeight('bold');
     sheet.setColumnWidth(themeCol + 1, 200);
   }
+
+  Logger.log('=====================================================');
+  Logger.log('🚀 Running autoTranslateNewPrfRows for Cashflows...');
+  Logger.log('📊 Active Spreadsheet ID: ' + ss.getId());
+  Logger.log('📑 Target Sheet Tab: ' + sheet.getName());
+  Logger.log('🔍 Column Mapping: Title=' + titleCol + ', Team/Product=' + prodCol + ', Key=' + keyCol + ', Translation=Col ' + String.fromCharCode(65 + transCol));
+  Logger.log('=====================================================');
 
   let translatedCount = 0;
   let skippedNonCfmCount = 0;
