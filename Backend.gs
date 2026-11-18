@@ -324,7 +324,7 @@ function isCashflowProduct_(product, key) {
 /**
  * Reads live PRF records from the connected Google Sheet.
  */
-function fetchLiveSheetRecords_(targetProduct, targetQuarters, targetYear) {
+function fetchLiveSheetRecords_(targetProduct, targetQuarters, targetYears) {
   const ss = getSpreadsheet_();
   if (!ss) return null;
 
@@ -382,6 +382,17 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters, targetYear) {
     });
   }
 
+  const yearSet = {};
+  if (Array.isArray(targetYears) && targetYears.length > 0) {
+    targetYears.forEach(function(y) {
+      if (y && y !== 'All') {
+        yearSet[String(y).trim()] = true;
+      }
+    });
+  } else if (typeof targetYears === 'string' && targetYears && targetYears !== 'All') {
+    yearSet[targetYears.trim()] = true;
+  }
+
   const isCfmTarget = targetProduct && (
     targetProduct.toUpperCase() === 'CFM' ||
     targetProduct.toUpperCase().indexOf('CASH') !== -1 ||
@@ -411,11 +422,9 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters, targetYear) {
     const normQuarter = normalizeQuarter_(rawQuarter);
     const rowYear = extractYear_(rawQuarter) || '2026';
 
-    // Filter by year if specified (and not 'All')
-    if (targetYear && targetYear !== 'All') {
-      if (rowYear && rowYear !== targetYear) {
-        continue;
-      }
+    // Filter by selected year(s) if specified
+    if (Object.keys(yearSet).length > 0 && !yearSet[rowYear]) {
+      continue;
     }
 
     // Filter by selected quarters
@@ -458,17 +467,17 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters, targetYear) {
  * Fetches PRF records from the live connected Google Sheet (with fallback to mock data if offline).
  * @param {string} product Selected product name (e.g. 'ETD', 'CFD', 'TRM').
  * @param {Array<string>} quarters Array of quarter tags (e.g. ['Q4', 'Q1']).
- * @param {string} year Optional calendar year (e.g. '2026', '2025', 'All').
+ * @param {Array<string>|string} years Optional array of calendar years (e.g. ['2026', '2027']).
  * @return {Object} Response object with items array.
  */
-function getPrfData(product, quarters, year) {
+function getPrfData(product, quarters, years) {
   try {
     const targetProduct = (product || 'ETD').toUpperCase();
-    const targetYear = year || '2026';
+    const targetYears = Array.isArray(years) ? years : (years ? [years] : ['2026']);
     const currentSheetId = getSpreadsheetId_();
 
     // 1. Attempt to query live Google Sheet
-    const liveItems = fetchLiveSheetRecords_(targetProduct, quarters, targetYear);
+    const liveItems = fetchLiveSheetRecords_(targetProduct, quarters, targetYears);
 
     if (liveItems && liveItems.length > 0) {
       console.log('Retrieved ' + liveItems.length + ' live PRF records from Google Sheet (' + PRIMARY_SHEET_NAME + ').');
@@ -478,7 +487,7 @@ function getPrfData(product, quarters, year) {
         spreadsheetId: currentSheetId || 'Configured Sheet',
         product: targetProduct,
         quarters: quarters || [],
-        year: targetYear,
+        years: targetYears,
         count: liveItems.length,
         items: liveItems
       };
@@ -500,10 +509,12 @@ function getPrfData(product, quarters, year) {
       });
     }
 
-    if (targetYear && targetYear !== 'All') {
+    if (Array.isArray(targetYears) && targetYears.length > 0 && !targetYears.includes('All')) {
+      const ySet = {};
+      targetYears.forEach(function(y) { ySet[String(y).trim()] = true; });
       filtered = filtered.filter(function(item) {
-        const y = extractYear_(item.roadmap) || '2026';
-        return y === targetYear;
+        const y = item.year || extractYear_(item.roadmap) || '2026';
+        return !!ySet[y];
       });
     }
 
@@ -513,7 +524,7 @@ function getPrfData(product, quarters, year) {
       spreadsheetId: currentSheetId || 'Offline Fallback',
       product: targetProduct,
       quarters: quarters || [],
-      year: targetYear,
+      years: targetYears,
       count: filtered.length,
       items: filtered
     };

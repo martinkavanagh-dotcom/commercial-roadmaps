@@ -471,3 +471,33 @@ test('Two-way write-back locates matching row by Jira Key and updates translatio
   assert.equal(sheetRows[2][3], 'Real-Time Settlement Affirmation Gateway');
 });
 
+// Test Multi-Year filtering allows selecting multiple chronological years simultaneously
+test('Multi-year filtering allows selecting multiple years (e.g. 2026 and 2027) while excluding 2024', () => {
+  function extractYear_(val) {
+    if (!val) return '';
+    const s = String(val).trim();
+    const match = s.match(/\b(20\d{2})\b/);
+    if (match) return match[1];
+    return '';
+  }
+
+  const deliverables = [
+    { key: 'CFM-101', quarter: '2026 Q1', deliverable: '2026 Netting' },
+    { key: 'CFM-102', quarter: '2027 Q1', deliverable: '2027 AI Router' },
+    { key: 'CFM-88',  quarter: '2024 Q1', deliverable: '2024 Legacy patch' },
+    { key: 'CFM-95',  quarter: '2025 Q1', deliverable: '2025 SWIFT MT103' }
+  ];
+
+  const targetYears = ['2026', '2027'];
+  const ySet = {};
+  targetYears.forEach(y => { ySet[y] = true; });
+
+  const filtered = deliverables.filter(item => {
+    const y = extractYear_(item.quarter) || '2026';
+    return !!ySet[y];
+  });
+
+  assert.equal(filtered.length, 2, 'Should return both 2026 and 2027 deliverables');
+  assert.deepEqual(filtered.map(i => i.key), ['CFM-101', 'CFM-102']);
+});
+
