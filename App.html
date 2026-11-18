@@ -742,7 +742,7 @@
     // Global State & Navigation
     const [view, setView] = useState('homepage'); // 'homepage' | 'division' | 'generator' | 'timeline'
     const [selectedDivision, setSelectedDivision] = useState('FX & S');
-    const [selectedProduct, setSelectedProduct] = useState('ETD');
+    const [selectedProduct, setSelectedProduct] = useState('CFM');
 
     // Server & Identity State
     const [serverConfig, setServerConfig] = useState(null);
@@ -896,6 +896,16 @@
       } else {
         setTimeout(() => {
           const mockItems = [
+            // CFM Products (Cash Flow Management)
+            { id: 'PRF-CFM-001', product: 'CFM', roadmap: 'Q1', deliverable: 'Bilateral cash netting rule engine and automated payment affirmation gateway', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-101' },
+            { id: 'PRF-CFM-002', product: 'CFM', roadmap: 'Q1', deliverable: 'Real-time Standard Settlement Instructions (SSI) enrichment service', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'CFM-102' },
+            { id: 'PRF-CFM-003', product: 'CFM', roadmap: 'Q2', deliverable: 'T+1 compressed settlement cash projection and intraday liquidity optimizer', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-105' },
+            { id: 'PRF-CFM-004', product: 'CFM', roadmap: 'Q2', deliverable: 'Direct SWIFT MT103 and ISO 20022 cashflow settlement instruction dispatch', category: 'Regulatory', theme: 'Connectivity & Coverage', jiraKey: 'CFM-108' },
+            { id: 'PRF-CFM-005', product: 'CFM', roadmap: 'Q3', deliverable: 'Predictive intraday cash shortfall alerts and Nostro break reconciliation', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-112' },
+            { id: 'PRF-CFM-006', product: 'CFM', roadmap: 'BL', deliverable: 'Cross-entity automated bilateral cash aggregation and netting router', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-120' },
+            { id: 'PRF-CFM-007', product: 'CFM', roadmap: 'Delivered', deliverable: 'Multi-currency trade cashflow aggregation microservice with real-time status', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-99' },
+
+            // ETD Products
             { id: 'PRF-ETD-001', product: 'ETD', roadmap: 'Q4', deliverable: 'Fix FIX protocol gateway queue latency under peak clearing volume', category: 'Tech Debt', theme: 'Performance & Connectivity', jiraKey: 'ETD-1021' },
             { id: 'PRF-ETD-002', product: 'ETD', roadmap: 'Q4', deliverable: 'Implement EMIR Refit XML reporting schema and automated validation', category: 'Regulatory', theme: 'Compliance', jiraKey: 'ETD-1044' },
             { id: 'PRF-ETD-003', product: 'ETD', roadmap: 'Q1', deliverable: 'Cross-broker real-time trade matching and post-trade allocation router', category: 'Strategic', theme: 'Execution & Clearing', jiraKey: 'ETD-1090' },
@@ -907,7 +917,12 @@
             { id: 'PRF-ETD-009', product: 'ETD', roadmap: 'BL', deliverable: 'Predictive trade failure alerts using historical trade discrepancy patterns', category: 'Strategic', theme: 'AI & Analytics', jiraKey: 'ETD-1301' },
             { id: 'PRF-ETD-010', product: 'ETD', roadmap: 'Delivered', deliverable: 'REST API v2 for position management with OAuth 2.0 mTLS authentication', category: 'Strategic', theme: 'Security & API', jiraKey: 'ETD-998' }
           ];
-          const filtered = mockItems.filter((item) => selectedQuarters.includes(item.roadmap));
+          const filtered = mockItems.filter((item) => {
+            const prodMatch = !selectedProduct ||
+              item.product.toUpperCase() === selectedProduct.toUpperCase() ||
+              (selectedProduct === 'CFM' && (item.product === 'CFM' || item.product === 'Cashflows'));
+            return prodMatch && selectedQuarters.includes(item.roadmap);
+          });
           setTable1Data(filtered);
           setDataSourceNotice('Default PRF Catalog');
           setSelectedTable1Ids(new Set());
@@ -1499,7 +1514,32 @@
               <div className="space-y-6">
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Core Production Lines</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div
+                      onClick={() => {
+                        setSelectedProduct('CFM');
+                        setView('generator');
+                      }}
+                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs border-2 border-teal-500/30 flex flex-col justify-between ring-2 ring-teal-500/10"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-osttra-teal text-white">
+                            Live Sync
+                          </span>
+                          <span className="text-xs text-teal-700 font-mono font-bold">ID: CFM-CORE</span>
+                        </div>
+                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">CFM</h3>
+                        <p className="text-xs font-medium text-slate-500 mt-1">Cash Flow Management</p>
+                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                          Bilateral cash netting, payment affirmation, liquidity optimization, and T+1 compressed settlement acceleration.
+                        </p>
+                      </div>
+                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>Last updated by: {currentUser} on 11/18/2026</span>
+                      </div>
+                    </div>
+
                     <div
                       onClick={() => {
                         setSelectedProduct('CFD');

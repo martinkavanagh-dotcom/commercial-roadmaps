@@ -271,8 +271,8 @@ function matchProduct_(rowProduct, targetProduct) {
   const tp = String(targetProduct).trim().toUpperCase();
 
   // Flexible alias matching for CFM and Cashflows
-  const isCfmRow = rp.indexOf('CFM') !== -1 || rp.indexOf('CASH') !== -1;
-  const isCfmTarget = tp.indexOf('CFM') !== -1 || tp.indexOf('CASH') !== -1;
+  const isCfmRow = rp.indexOf('CFM') !== -1 || rp.indexOf('CASH') !== -1 || rp.indexOf('FLOW') !== -1;
+  const isCfmTarget = tp.indexOf('CFM') !== -1 || tp.indexOf('CASH') !== -1 || tp.indexOf('FLOW') !== -1;
   if (isCfmRow && isCfmTarget) {
     return true;
   }
@@ -953,6 +953,16 @@ function testCommercialBackend() {
  */
 function getPrfRepository_() {
   return [
+    // CFM Products (Cash Flow Management)
+    { id: 'PRF-CFM-001', product: 'CFM', roadmap: 'Q1', deliverable: 'Bilateral cash netting rule engine and automated payment affirmation gateway', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-101' },
+    { id: 'PRF-CFM-002', product: 'CFM', roadmap: 'Q1', deliverable: 'Real-time Standard Settlement Instructions (SSI) enrichment service', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'CFM-102' },
+    { id: 'PRF-CFM-003', product: 'CFM', roadmap: 'Q2', deliverable: 'T+1 compressed settlement cash projection and intraday liquidity optimizer', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-105' },
+    { id: 'PRF-CFM-004', product: 'CFM', roadmap: 'Q2', deliverable: 'Direct SWIFT MT103 and ISO 20022 cashflow settlement instruction dispatch', category: 'Regulatory', theme: 'Connectivity & Coverage', jiraKey: 'CFM-108' },
+    { id: 'PRF-CFM-005', product: 'CFM', roadmap: 'Q3', deliverable: 'Predictive intraday cash shortfall alerts and Nostro break reconciliation', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-112' },
+    { id: 'PRF-CFM-006', product: 'CFM', roadmap: 'BL', deliverable: 'Cross-entity automated bilateral cash aggregation and netting router', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-120' },
+    { id: 'PRF-CFM-007', product: 'CFM', roadmap: 'Delivered', deliverable: 'Multi-currency trade cashflow aggregation microservice with real-time status', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-99' },
+
+    // ETD Products (Exchange Traded Derivatives)
     { id: 'PRF-ETD-001', product: 'ETD', roadmap: 'Q4', deliverable: 'Fix FIX protocol gateway queue latency under peak clearing volume', category: 'Tech Debt', theme: 'Performance & Connectivity', jiraKey: 'ETD-1021' },
     { id: 'PRF-ETD-002', product: 'ETD', roadmap: 'Q4', deliverable: 'Implement EMIR Refit XML reporting schema and automated validation', category: 'Regulatory', theme: 'Compliance', jiraKey: 'ETD-1044' },
     { id: 'PRF-ETD-003', product: 'ETD', roadmap: 'Q1', deliverable: 'Cross-broker real-time trade matching and post-trade allocation router', category: 'Strategic', theme: 'Execution & Clearing', jiraKey: 'ETD-1090' },
