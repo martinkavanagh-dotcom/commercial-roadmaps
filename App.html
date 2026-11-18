@@ -750,6 +750,8 @@
     const [loadingConfig, setLoadingConfig] = useState(true);
 
     // Generator & Staging State
+    const allYears = ['2026', '2025', '2027', 'All'];
+    const [selectedYear, setSelectedYear] = useState('2026');
     const allQuarters = ['Q4', 'Q1', 'Q2', 'Q3', 'BL', 'Delivered'];
     const [selectedQuarters, setSelectedQuarters] = useState(['Q4', 'Q1', 'Q2', 'Q3']);
     
@@ -892,36 +894,37 @@
             setTable1Loading(false);
             alert('Error communicating with backend: ' + err.message);
           })
-          .getPrfData(selectedProduct, selectedQuarters);
+          .getPrfData(selectedProduct, selectedQuarters, selectedYear);
       } else {
         setTimeout(() => {
           const mockItems = [
             // CFM Products (Cash Flow Management)
-            { id: 'PRF-CFM-001', product: 'CFM', roadmap: 'Q1', deliverable: 'Bilateral cash netting rule engine and automated payment affirmation gateway', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-101' },
-            { id: 'PRF-CFM-002', product: 'CFM', roadmap: 'Q1', deliverable: 'Real-time Standard Settlement Instructions (SSI) enrichment service', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'CFM-102' },
-            { id: 'PRF-CFM-003', product: 'CFM', roadmap: 'Q2', deliverable: 'T+1 compressed settlement cash projection and intraday liquidity optimizer', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-105' },
-            { id: 'PRF-CFM-004', product: 'CFM', roadmap: 'Q2', deliverable: 'Direct SWIFT MT103 and ISO 20022 cashflow settlement instruction dispatch', category: 'Regulatory', theme: 'Connectivity & Coverage', jiraKey: 'CFM-108' },
-            { id: 'PRF-CFM-005', product: 'CFM', roadmap: 'Q3', deliverable: 'Predictive intraday cash shortfall alerts and Nostro break reconciliation', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-112' },
-            { id: 'PRF-CFM-006', product: 'CFM', roadmap: 'BL', deliverable: 'Cross-entity automated bilateral cash aggregation and netting router', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-120' },
-            { id: 'PRF-CFM-007', product: 'CFM', roadmap: 'Delivered', deliverable: 'Multi-currency trade cashflow aggregation microservice with real-time status', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-99' },
+            { id: 'PRF-CFM-001', product: 'CFM', roadmap: 'Q1', year: '2026', deliverable: 'Bilateral cash netting rule engine and automated payment affirmation gateway', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-101' },
+            { id: 'PRF-CFM-002', product: 'CFM', roadmap: 'Q1', year: '2026', deliverable: 'Real-time Standard Settlement Instructions (SSI) enrichment service', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'CFM-102' },
+            { id: 'PRF-CFM-003', product: 'CFM', roadmap: 'Q2', year: '2026', deliverable: 'T+1 compressed settlement cash projection and intraday liquidity optimizer', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-105' },
+            { id: 'PRF-CFM-004', product: 'CFM', roadmap: 'Q2', year: '2026', deliverable: 'Direct SWIFT MT103 and ISO 20022 cashflow settlement instruction dispatch', category: 'Regulatory', theme: 'Connectivity & Coverage', jiraKey: 'CFM-108' },
+            { id: 'PRF-CFM-005', product: 'CFM', roadmap: 'Q3', year: '2026', deliverable: 'Predictive intraday cash shortfall alerts and Nostro break reconciliation', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-112' },
+            { id: 'PRF-CFM-006', product: 'CFM', roadmap: 'BL', year: '2026', deliverable: 'Cross-entity automated bilateral cash aggregation and netting router', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'CFM-120' },
+            { id: 'PRF-CFM-007', product: 'CFM', roadmap: 'Delivered', year: '2025', deliverable: 'Multi-currency trade cashflow aggregation microservice with real-time status', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'CFM-99' },
 
             // ETD Products
-            { id: 'PRF-ETD-001', product: 'ETD', roadmap: 'Q4', deliverable: 'Fix FIX protocol gateway queue latency under peak clearing volume', category: 'Tech Debt', theme: 'Performance & Connectivity', jiraKey: 'ETD-1021' },
-            { id: 'PRF-ETD-002', product: 'ETD', roadmap: 'Q4', deliverable: 'Implement EMIR Refit XML reporting schema and automated validation', category: 'Regulatory', theme: 'Compliance', jiraKey: 'ETD-1044' },
-            { id: 'PRF-ETD-003', product: 'ETD', roadmap: 'Q1', deliverable: 'Cross-broker real-time trade matching and post-trade allocation router', category: 'Strategic', theme: 'Execution & Clearing', jiraKey: 'ETD-1090' },
-            { id: 'PRF-ETD-004', product: 'ETD', roadmap: 'Q1', deliverable: 'Tier 1 Prime Broker custom clearing trade feed integration and CSV parser', category: 'Client Request', theme: 'Client Partnership', jiraKey: 'ETD-1115' },
-            { id: 'PRF-ETD-005', product: 'ETD', roadmap: 'Q2', deliverable: 'Sub-second intraday margin calculation microservice with SPAN risk checks', category: 'Strategic', theme: 'Risk Management', jiraKey: 'ETD-1152' },
-            { id: 'PRF-ETD-006', product: 'ETD', roadmap: 'Q2', deliverable: 'Automated post-trade exception resolution workflow and audit trail export', category: 'Operational Efficiency', theme: 'Automation', jiraKey: 'ETD-1188' },
-            { id: 'PRF-ETD-007', product: 'ETD', roadmap: 'Q3', deliverable: 'Multi-asset derivatives STP connectivity for regional exchange members', category: 'Strategic', theme: 'Market Expansion', jiraKey: 'ETD-1220' },
-            { id: 'PRF-ETD-008', product: 'ETD', roadmap: 'Q3', deliverable: 'Cloud-native zero-downtime database failover cluster deployment', category: 'Tech Debt', theme: 'Resilience', jiraKey: 'ETD-1245' },
-            { id: 'PRF-ETD-009', product: 'ETD', roadmap: 'BL', deliverable: 'Predictive trade failure alerts using historical trade discrepancy patterns', category: 'Strategic', theme: 'AI & Analytics', jiraKey: 'ETD-1301' },
-            { id: 'PRF-ETD-010', product: 'ETD', roadmap: 'Delivered', deliverable: 'REST API v2 for position management with OAuth 2.0 mTLS authentication', category: 'Strategic', theme: 'Security & API', jiraKey: 'ETD-998' }
+            { id: 'PRF-ETD-001', product: 'ETD', roadmap: 'Q4', year: '2025', deliverable: 'Fix FIX protocol gateway queue latency under peak clearing volume', category: 'Tech Debt', theme: 'Performance & Connectivity', jiraKey: 'ETD-1021' },
+            { id: 'PRF-ETD-002', product: 'ETD', roadmap: 'Q4', year: '2025', deliverable: 'Implement EMIR Refit XML reporting schema and automated validation', category: 'Regulatory', theme: 'Compliance', jiraKey: 'ETD-1044' },
+            { id: 'PRF-ETD-003', product: 'ETD', roadmap: 'Q1', year: '2026', deliverable: 'Cross-broker real-time trade matching and post-trade allocation router', category: 'Strategic', theme: 'Execution & Clearing', jiraKey: 'ETD-1090' },
+            { id: 'PRF-ETD-004', product: 'ETD', roadmap: 'Q1', year: '2026', deliverable: 'Tier 1 Prime Broker custom clearing trade feed integration and CSV parser', category: 'Client Request', theme: 'Client Partnership', jiraKey: 'ETD-1115' },
+            { id: 'PRF-ETD-005', product: 'ETD', roadmap: 'Q2', year: '2026', deliverable: 'Sub-second intraday margin calculation microservice with SPAN risk checks', category: 'Strategic', theme: 'Risk Management', jiraKey: 'ETD-1152' },
+            { id: 'PRF-ETD-006', product: 'ETD', roadmap: 'Q2', year: '2026', deliverable: 'Automated post-trade exception resolution workflow and audit trail export', category: 'Operational Efficiency', theme: 'Automation', jiraKey: 'ETD-1188' },
+            { id: 'PRF-ETD-007', product: 'ETD', roadmap: 'Q3', year: '2026', deliverable: 'Multi-asset derivatives STP connectivity for regional exchange members', category: 'Strategic', theme: 'Market Expansion', jiraKey: 'ETD-1220' },
+            { id: 'PRF-ETD-008', product: 'ETD', roadmap: 'Q3', year: '2026', deliverable: 'Cloud-native zero-downtime database failover cluster deployment', category: 'Tech Debt', theme: 'Resilience', jiraKey: 'ETD-1245' },
+            { id: 'PRF-ETD-009', product: 'ETD', roadmap: 'BL', year: '2026', deliverable: 'Predictive trade failure alerts using historical trade discrepancy patterns', category: 'Strategic', theme: 'AI & Analytics', jiraKey: 'ETD-1301' },
+            { id: 'PRF-ETD-010', product: 'ETD', roadmap: 'Delivered', year: '2025', deliverable: 'REST API v2 for position management with OAuth 2.0 mTLS authentication', category: 'Strategic', theme: 'Security & API', jiraKey: 'ETD-998' }
           ];
           const filtered = mockItems.filter((item) => {
             const prodMatch = !selectedProduct ||
               item.product.toUpperCase() === selectedProduct.toUpperCase() ||
               (selectedProduct === 'CFM' && (item.product === 'CFM' || item.product === 'Cashflows'));
-            return prodMatch && selectedQuarters.includes(item.roadmap);
+            const yearMatch = selectedYear === 'All' || !item.year || item.year === selectedYear;
+            return prodMatch && yearMatch && selectedQuarters.includes(item.roadmap);
           });
           setTable1Data(filtered);
           setDataSourceNotice('Default PRF Catalog');
@@ -1141,6 +1144,12 @@
 
       if (window.google && google.script && google.script.run) {
         google.script.run.produceCommercialRoadmap(selectedProduct, itemsToPromote);
+        // Two-way write-back: persist approved headlines to Column N of the Google Sheet
+        itemsToPromote.forEach((item) => {
+          if (item.jiraKey && item.deliverable) {
+            google.script.run.updateCommercialTranslationInSheet(item.jiraKey, item.deliverable, item.theme);
+          }
+        });
       }
 
       // Navigate to Timeline View
@@ -1653,34 +1662,62 @@
                   </div>
                 </div>
 
-                {/* Quarter Selection Bar */}
-                <div className="mt-5">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-                    Select Target Quarters / Milestones:
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {allQuarters.map((q) => {
-                      const active = selectedQuarters.includes(q);
-                      return (
-                        <button
-                          key={q}
-                          onClick={() => toggleQuarter(q)}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs border ${
-                            active
-                              ? 'bg-osttra-teal text-white border-teal-600 shadow-sm shadow-teal-500/20'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-teal-300 hover:bg-teal-50/40'
-                          }`}
-                        >
-                          [ {q} ]
-                        </button>
-                      );
-                    })}
+                {/* Year & Quarter Selection Bars */}
+                <div className="mt-5 space-y-4">
+                  {/* Year Selection Bar */}
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Select Roadmap Year:
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {allYears.map((y) => {
+                        const active = selectedYear === y;
+                        return (
+                          <button
+                            key={y}
+                            onClick={() => setSelectedYear(y)}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs border ${
+                              active
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            {y === 'All' ? 'All Years' : y}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Quarter Selection Bar */}
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Select Target Quarters / Milestones:
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {allQuarters.map((q) => {
+                        const active = selectedQuarters.includes(q);
+                        return (
+                          <button
+                            key={q}
+                            onClick={() => toggleQuarter(q)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs border ${
+                              active
+                                ? 'bg-osttra-teal text-white border-teal-600 shadow-sm shadow-teal-500/20'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-teal-300 hover:bg-teal-50/40'
+                            }`}
+                          >
+                            [ {q} ]
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Top Action Button: [ Run ] */}
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
                     <p className="text-xs text-slate-500">
-                      {selectedQuarters.length} quarter(s) selected: {selectedQuarters.join(', ') || 'None'}
+                      Year: <strong className="text-slate-800 font-semibold">{selectedYear === 'All' ? 'All Years' : selectedYear}</strong> | {selectedQuarters.length} quarter(s) selected: {selectedQuarters.join(', ') || 'None'}
                     </p>
                     <button
                       onClick={handleFetchPrfData}
@@ -1927,8 +1964,13 @@
                                     <div className="flex items-center gap-2">
                                       <button
                                         type="button"
-                                        onClick={() => setEditingStagingRowId(null)}
-                                        className="text-[10px] font-bold bg-osttra-teal text-white px-2.5 py-0.5 rounded shadow-2xs"
+                                        onClick={() => {
+                                          setEditingStagingRowId(null);
+                                          if (window.google && google.script && google.script.run && row.jiraKey) {
+                                            google.script.run.updateCommercialTranslationInSheet(row.jiraKey, row.deliverable, row.theme);
+                                          }
+                                        }}
+                                        className="text-[10px] font-bold bg-osttra-teal text-white px-2.5 py-0.5 rounded shadow-2xs cursor-pointer hover:bg-[#008285]"
                                       >
                                         Done ✓
                                       </button>

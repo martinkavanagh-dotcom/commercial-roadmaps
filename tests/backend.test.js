@@ -393,3 +393,81 @@ test('fetchLiveSheetRecords_ filtering logic strictly includes only rows where T
   assert.deepEqual(filteredItems.map(i => i.key), ['CFM-101', 'CFM-102', 'CFM-103']);
 });
 
+// Test Year extraction from Fix Version / Quarter strings
+test('extractYear_ correctly identifies 4-digit years and handles unversioned strings', () => {
+  function extractYear_(val) {
+    if (!val) return '';
+    const s = String(val).trim();
+    const match = s.match(/\b(20\d{2})\b/);
+    if (match) return match[1];
+    const d = new Date(s);
+    if (!isNaN(d.getTime()) && d.getFullYear() >= 2020) {
+      return String(d.getFullYear());
+    }
+    return '';
+  }
+
+  assert.equal(extractYear_('2026 Q1'), '2026');
+  assert.equal(extractYear_('Q2 2026'), '2026');
+  assert.equal(extractYear_('2025-Q4'), '2025');
+  assert.equal(extractYear_('2024 Q1'), '2024');
+  assert.equal(extractYear_('Q1'), '');
+  assert.equal(extractYear_('Backlog'), '');
+  assert.equal(extractYear_('Delivered'), '');
+  assert.equal(extractYear_('2027-03-31'), '2027');
+});
+
+// Test Year filtering prevents stale items from past years showing up
+test('Year filtering isolates 2026 items and excludes 2024/2025 deliverables', () => {
+  function extractYear_(val) {
+    if (!val) return '';
+    const s = String(val).trim();
+    const match = s.match(/\b(20\d{2})\b/);
+    if (match) return match[1];
+    return '';
+  }
+
+  const deliverables = [
+    { key: 'CFM-101', quarter: '2026 Q1', deliverable: '2026 Bilateral netting engine' },
+    { key: 'CFM-102', quarter: '2026 Q2', deliverable: '2026 T+1 liquidity projection' },
+    { key: 'CFM-88',  quarter: '2024 Q1', deliverable: 'Old 2024 legacy netting patch' },
+    { key: 'CFM-95',  quarter: '2025 Q1', deliverable: 'Old 2025 SWIFT MT103 parser' }
+  ];
+
+  const targetYear = '2026';
+  const filtered = deliverables.filter(item => {
+    const y = extractYear_(item.quarter) || '2026';
+    return y === targetYear;
+  });
+
+  assert.equal(filtered.length, 2, 'Should only return the two 2026 deliverables');
+  assert.equal(filtered[0].key, 'CFM-101');
+  assert.equal(filtered[1].key, 'CFM-102');
+  assert.ok(!filtered.some(i => i.key === 'CFM-88'), '2024 stale item must be excluded');
+  assert.ok(!filtered.some(i => i.key === 'CFM-95'), '2025 stale item must be excluded');
+});
+
+// Test Two-Way Write-Back finding matching row by Jira Key
+test('Two-way write-back locates matching row by Jira Key and updates translation cell', () => {
+  const sheetRows = [
+    ['Key', 'Summary', 'Team', 'Commercial Translation'],
+    ['CFM-101', 'Netting engine', 'Cashflows', 'Original Translation'],
+    ['CFM-102', 'Affirmation feed', 'Cashflows', 'Old Headline']
+  ];
+
+  const targetKey = 'CFM-102';
+  const newHeadline = 'Real-Time Settlement Affirmation Gateway';
+  let updatedRow = -1;
+
+  for (let r = 1; r < sheetRows.length; r++) {
+    if (sheetRows[r][0] === targetKey) {
+      sheetRows[r][3] = newHeadline;
+      updatedRow = r;
+      break;
+    }
+  }
+
+  assert.equal(updatedRow, 2);
+  assert.equal(sheetRows[2][3], 'Real-Time Settlement Affirmation Gateway');
+});
+

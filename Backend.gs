@@ -267,6 +267,21 @@ function normalizeQuarter_(val) {
 }
 
 /**
+ * Extracts 4-digit calendar year from quarter/fix-version/date strings (e.g. '2026 Q1', 'Q2 2025', '2024-Q3').
+ */
+function extractYear_(val) {
+  if (!val) return '';
+  const s = String(val).trim();
+  const match = s.match(/\b(20\d{2})\b/);
+  if (match) return match[1];
+  const d = new Date(s);
+  if (!isNaN(d.getTime()) && d.getFullYear() >= 2020) {
+    return String(d.getFullYear());
+  }
+  return '';
+}
+
+/**
  * Matches row product against target product filter flexibly (e.g. CFM <-> Cashflows).
  */
 function matchProduct_(rowProduct, targetProduct) {
@@ -309,7 +324,7 @@ function isCashflowProduct_(product, key) {
 /**
  * Reads live PRF records from the connected Google Sheet.
  */
-function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
+function fetchLiveSheetRecords_(targetProduct, targetQuarters, targetYear) {
   const ss = getSpreadsheet_();
   if (!ss) return null;
 
@@ -394,6 +409,14 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
 
     const rawQuarter = quarterIdx !== -1 ? row[quarterIdx] : 'BL';
     const normQuarter = normalizeQuarter_(rawQuarter);
+    const rowYear = extractYear_(rawQuarter) || '2026';
+
+    // Filter by year if specified (and not 'All')
+    if (targetYear && targetYear !== 'All') {
+      if (rowYear && rowYear !== targetYear) {
+        continue;
+      }
+    }
 
     // Filter by selected quarters
     if (Object.keys(quarterSet).length > 0 && !quarterSet[normQuarter]) {
@@ -415,6 +438,7 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
       team: rowTeam || (isCfmTarget ? 'Cashflows' : targetProduct),
       product: rowTeam || targetProduct,
       roadmap: normQuarter,
+      year: rowYear,
       deliverable: deliverable,
       description: rawDesc,
       translatedDeliverable: translated,
@@ -434,15 +458,17 @@ function fetchLiveSheetRecords_(targetProduct, targetQuarters) {
  * Fetches PRF records from the live connected Google Sheet (with fallback to mock data if offline).
  * @param {string} product Selected product name (e.g. 'ETD', 'CFD', 'TRM').
  * @param {Array<string>} quarters Array of quarter tags (e.g. ['Q4', 'Q1']).
+ * @param {string} year Optional calendar year (e.g. '2026', '2025', 'All').
  * @return {Object} Response object with items array.
  */
-function getPrfData(product, quarters) {
+function getPrfData(product, quarters, year) {
   try {
     const targetProduct = (product || 'ETD').toUpperCase();
+    const targetYear = year || '2026';
     const currentSheetId = getSpreadsheetId_();
 
     // 1. Attempt to query live Google Sheet
-    const liveItems = fetchLiveSheetRecords_(targetProduct, quarters);
+    const liveItems = fetchLiveSheetRecords_(targetProduct, quarters, targetYear);
 
     if (liveItems && liveItems.length > 0) {
       console.log('Retrieved ' + liveItems.length + ' live PRF records from Google Sheet (' + PRIMARY_SHEET_NAME + ').');
@@ -452,6 +478,7 @@ function getPrfData(product, quarters) {
         spreadsheetId: currentSheetId || 'Configured Sheet',
         product: targetProduct,
         quarters: quarters || [],
+        year: targetYear,
         count: liveItems.length,
         items: liveItems
       };
@@ -473,12 +500,20 @@ function getPrfData(product, quarters) {
       });
     }
 
+    if (targetYear && targetYear !== 'All') {
+      filtered = filtered.filter(function(item) {
+        const y = extractYear_(item.roadmap) || '2026';
+        return y === targetYear;
+      });
+    }
+
     return {
       success: true,
       source: 'Default PRF Catalog (Sheet empty or unpopulated for this selection)',
       spreadsheetId: currentSheetId || 'Offline Fallback',
       product: targetProduct,
       quarters: quarters || [],
+      year: targetYear,
       count: filtered.length,
       items: filtered
     };
@@ -872,6 +907,113 @@ function produceCommercialRoadmap(product, items) {
 }
 
 /**
+ * Updates an item's commercial translation directly in Column N of the active Google Sheet.
+ * Called when a user edits a commercial headline in the portal, enabling two-way write-back.
+ */
+function updateCommercialTranslationInSheet(jiraKey, newTranslation, newTheme) {
+  try {
+    if (!jiraKey) {
+      return { success: false, error: 'No Jira Key provided' };
+    }
+
+    const ss = getSpreadsheet_();
+    if (!ss) {
+      return { success: false, error: 'Spreadsheet not connected' };
+    }
+
+    let sheet = getSheetByGid_(ss, TARGET_SHEET_GID) ||
+      ss.getSheetByName(PRIMARY_SHEET_NAME) ||
+      ss.getSheetByName(BACKUP_SHEET_NAME) ||
+      ss.getSheetByName(LEGACY_SHEET_NAME) ||
+      ss.getSheets()[0];
+
+    if (!sheet) {
+      return { success: false, error: 'Sheet tab not found' };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return { success: false, error: 'Sheet is empty' };
+    }
+
+    const headers = data[0].map(function(h) { return String(h || '').trim(); });
+    function findCol(regexes) {
+      for (let r = 0; r < regexes.length; r++) {
+        for (let i = 0; i < headers.length; i++) {
+          if (regexes[r].test(headers[i])) return i;
+        }
+      }
+      return -1;
+    }
+
+    const keyCol = findCol([/^issue\s*key$/i, /^key$/i, /^jira\s*key$/i]);
+    let transCol = findCol([/^commercial\s*translation$/i, /^translated/i, /^commercial\s*title$/i, /^translation$/i, /^commercial$/i]);
+    if (transCol === -1 && headers.length >= 14) {
+      transCol = 13; // Column N
+    }
+    const themeCol = findCol([/^commercial\s*theme$/i, /^theme$/i, /^initiative$/i]);
+
+    if (keyCol === -1 || transCol === -1) {
+      return { success: false, error: 'Required columns not found in sheet' };
+    }
+
+    const cleanKey = String(jiraKey).trim().toUpperCase();
+    let updatedRow = -1;
+
+    for (let r = 1; r < data.length; r++) {
+      const rowKey = String(data[r][keyCol] || '').trim().toUpperCase();
+      if (rowKey === cleanKey) {
+        const cleanedHeadline = cleanCommercialHeadline_(newTranslation);
+        sheet.getRange(r + 1, transCol + 1).setValue(cleanedHeadline);
+        if (newTheme && themeCol !== -1) {
+          sheet.getRange(r + 1, themeCol + 1).setValue(newTheme);
+        }
+        updatedRow = r + 1;
+        break;
+      }
+    }
+
+    if (updatedRow !== -1) {
+      console.log('Two-way write-back updated row ' + updatedRow + ' for key ' + jiraKey + ': ' + newTranslation);
+      return {
+        success: true,
+        row: updatedRow,
+        jiraKey: jiraKey,
+        translation: newTranslation,
+        message: 'Successfully updated Column N in Google Sheet for ' + jiraKey
+      };
+    } else {
+      return { success: false, message: 'Ticket ' + jiraKey + ' not found in sheet rows' };
+    }
+  } catch (e) {
+    console.error('updateCommercialTranslationInSheet error:', e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Installs an hourly time-driven trigger to automatically translate newly added Cashflow rows in the sheet.
+ */
+function installAutoTranslateTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'autoTranslateNewPrfRows') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  ScriptApp.newTrigger('autoTranslateNewPrfRows')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  return {
+    success: true,
+    message: 'Hourly automated Cashflows translation trigger successfully installed.'
+  };
+}
+
+/**
  * Cleans and transforms raw developer PRF text into clean commercial headlines.
  * Strips technical noise, ticket prefixes, and never prepends 'Strategic Commercial:'.
  */
@@ -1155,6 +1297,7 @@ function onOpen(e) {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('OSTTRA Roadmaps')
       .addItem('🤖 Auto-Translate New PRF Rows', 'autoTranslateNewPrfRows')
+      .addItem('⏱️ Enable Hourly Auto-Translation Trigger', 'installAutoTranslateTrigger')
       .addSeparator()
       .addItem('⚙️ Check Configuration', 'testCommercialBackend')
       .addToUi();
