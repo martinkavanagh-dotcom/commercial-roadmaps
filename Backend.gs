@@ -822,7 +822,23 @@ function translateCommercialItems(selectedItems) {
       };
     }
 
-    const translatedItems = selectedItems.map(function(item) {
+    const QUARTER_ORDER = { 'DELIVERED': 0, 'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4, 'BL': 5, 'BACKLOG': 5 };
+
+    const sortedItems = selectedItems.slice().sort(function(a, b) {
+      const yrA = parseInt(a.year || extractYear_(a.roadmap) || '2026', 10);
+      const yrB = parseInt(b.year || extractYear_(b.roadmap) || '2026', 10);
+      if (yrA !== yrB) return yrA - yrB; // Oldest year to future year
+
+      const qA = (normalizeQuarter_(a.roadmap) || 'BL').toUpperCase();
+      const qB = (normalizeQuarter_(b.roadmap) || 'BL').toUpperCase();
+      const orderA = QUARTER_ORDER[qA] !== undefined ? QUARTER_ORDER[qA] : 99;
+      const orderB = QUARTER_ORDER[qB] !== undefined ? QUARTER_ORDER[qB] : 99;
+      if (orderA !== orderB) return orderA - orderB; // Oldest quarter to future quarter
+
+      return String(a.jiraKey || a.id).localeCompare(String(b.jiraKey || b.id));
+    });
+
+    const translatedItems = sortedItems.map(function(item) {
       return transformPrfToCommercial_(item);
     });
 
@@ -1267,6 +1283,7 @@ function autoTranslateNewPrfRows() {
           team: prod || 'Cashflows',
           product: prod || 'CFM',
           roadmap: quarterCol !== -1 && row[quarterCol] ? normalizeQuarter_(row[quarterCol]) : 'BL',
+          year: quarterCol !== -1 && row[quarterCol] ? (extractYear_(row[quarterCol]) || '2026') : '2026',
           category: catCol !== -1 && row[catCol] ? String(row[catCol]).trim() : 'Strategic',
           theme: themeCol !== -1 && row[themeCol] ? String(row[themeCol]).trim() : 'Functional & Usability',
           deliverable: deliverable,

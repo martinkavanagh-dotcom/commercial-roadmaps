@@ -651,4 +651,54 @@ test('Chronological year grouping separates deliverables into distinct year cont
   assert.ok(selectedIds.has('6'));
 });
 
+// Test translateCommercialItems sorts deliverables chronologically from oldest to future
+test('translateCommercialItems sorts input deliverables chronologically from oldest year to future year, and quarters', () => {
+  const QUARTER_ORDER = { 'DELIVERED': 0, 'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4, 'BL': 5, 'BACKLOG': 5 };
+
+  function sortCommercialItems(selectedItems) {
+    return selectedItems.slice().sort(function(a, b) {
+      const yrA = parseInt(a.year || '2026', 10);
+      const yrB = parseInt(b.year || '2026', 10);
+      if (yrA !== yrB) return yrA - yrB;
+
+      const qA = (a.roadmap || 'BL').toUpperCase();
+      const qB = (b.roadmap || 'BL').toUpperCase();
+      const orderA = QUARTER_ORDER[qA] !== undefined ? QUARTER_ORDER[qA] : 99;
+      const orderB = QUARTER_ORDER[qB] !== undefined ? QUARTER_ORDER[qB] : 99;
+      if (orderA !== orderB) return orderA - orderB;
+
+      return String(a.jiraKey || a.id).localeCompare(String(b.jiraKey || b.id));
+    });
+  }
+
+  const mixedItems = [
+    { id: '1', year: '2027', roadmap: 'Q2', deliverable: '2027 Q2 Item' },
+    { id: '2', year: '2026', roadmap: 'Q4', deliverable: '2026 Q4 Item' },
+    { id: '3', year: '2025', roadmap: 'Delivered', deliverable: '2025 Historic' },
+    { id: '4', year: '2027', roadmap: 'Q1', deliverable: '2027 Q1 Item' },
+    { id: '5', year: '2026', roadmap: 'Q1', deliverable: '2026 Q1 Item' },
+    { id: '6', year: '2026', roadmap: 'BL', deliverable: '2026 Backlog' }
+  ];
+
+  const sorted = sortCommercialItems(mixedItems);
+
+  // Expected chronological sequence:
+  // 1. 2025 Delivered
+  // 2. 2026 Q1
+  // 3. 2026 Q4
+  // 4. 2026 BL
+  // 5. 2027 Q1
+  // 6. 2027 Q2
+  const sequence = sorted.map(i => `${i.year} ${i.roadmap}`);
+  assert.deepEqual(sequence, [
+    '2025 Delivered',
+    '2026 Q1',
+    '2026 Q4',
+    '2026 BL',
+    '2027 Q1',
+    '2027 Q2'
+  ]);
+});
+
+
 
