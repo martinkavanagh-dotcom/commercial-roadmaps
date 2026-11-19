@@ -322,6 +322,31 @@ function isCashflowProduct_(product, key) {
 }
 
 /**
+ * Detects whether a product name or Jira issue key belongs to Exchange Traded Derivatives (ETD).
+ */
+function isEtdProduct_(product, key) {
+  const p = String(product || '').trim().toUpperCase();
+  const k = String(key || '').trim().toUpperCase();
+
+  if (p.indexOf('ETD') !== -1 || p.indexOf('FUTUR') !== -1 || p.indexOf('OPTION') !== -1 || p.indexOf('EXCHANGE') !== -1 || p.indexOf('LISTED') !== -1) {
+    return true;
+  }
+  if (k.startsWith('ETD-') || k.startsWith('ALLOC-') || k.startsWith('FUT-') || k.startsWith('OPT-')) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Checks whether authoritative Product Owner markdown context exists for a given product/ticket.
+ */
+function hasProductContext_(product, key) {
+  if (isCashflowProduct_(product, key)) return true;
+  if (isEtdProduct_(product, key)) return true;
+  return false;
+}
+
+/**
  * Reads live PRF records from the connected Google Sheet.
  */
 function fetchLiveSheetRecords_(targetProduct, targetQuarters, targetYears) {
@@ -549,8 +574,8 @@ function translateWithGemini_(item) {
       return null;
     }
 
-    const isCfm = isCashflowProduct_(item.product, item.jiraKey || item.id);
-    const productContext = (isCfm && typeof getProductContextMarkdown_ === 'function') ? getProductContextMarkdown_() : '';
+    const targetProd = item.product || item.team || 'CFM';
+    const productContext = typeof getProductContextMarkdown_ === 'function' ? getProductContextMarkdown_(targetProd) : '';
     const translationRules = typeof getTranslationRulesMarkdown_ === 'function' ? getTranslationRulesMarkdown_() : '';
 
     var prompt = "You are a Principal Product Marketing Director at OSTTRA specializing in Capital Markets and Post-Trade Infrastructure.\n\n" +
@@ -898,8 +923,7 @@ function generateCommercialNarrative(params) {
     // Attempt AI Generation via AIProxy if available
     if (typeof AIProxy !== 'undefined' && AIProxy.generateContent) {
       try {
-        const isCfm = isCashflowProduct_(product, '');
-        const productContext = (isCfm && typeof getProductContextMarkdown_ === 'function') ? getProductContextMarkdown_() : '';
+        const productContext = typeof getProductContextMarkdown_ === 'function' ? getProductContextMarkdown_(product) : '';
 
         const itemsSummary = items.map(function(item, idx) {
           return (idx + 1) + '. [' + (item.year || '2026') + ' ' + (item.roadmap || 'Q1') + '] ' +
@@ -1477,8 +1501,8 @@ function autoTranslateNewPrfRows() {
         const prod = prodCol !== -1 ? String(row[prodCol] || '').trim() : '';
         const jiraKey = keyCol !== -1 ? String(row[keyCol] || '').trim() : '';
 
-        // Only translate Cash Flow Management (CFM) records; skip other products until their domain markdown context is added
-        if (!isCashflowProduct_(prod, jiraKey)) {
+        // Only translate records with rich Product Owner Markdown context (e.g. CFM, ETD)
+        if (!hasProductContext_(prod, jiraKey)) {
           skippedNonCfmCount++;
           continue;
         }

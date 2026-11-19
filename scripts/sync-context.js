@@ -1,20 +1,23 @@
 /**
- * Context & Guardrails Synchronizer
- * Ingests markdown files from context/guardrails/ and context/cfm/
- * and generates Apps Script compatible PromptContext.gs
+ * Context & Guardrails Synchronizer (Dynamic Multi-Product Architecture)
+ * Ingests shared guardrails and all product-specific markdown folders under context/
+ * and generates Apps Script compatible PromptContext.gs.
+ *
+ * To add a new product: Simply create context/<product-key>/ containing its markdown files,
+ * and run: node scripts/sync-context.js
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const rootDir = path.resolve(__dirname, '..');
-const guardrailsDir = path.join(rootDir, 'context', 'guardrails');
-const cfmDir = path.join(rootDir, 'context', 'cfm');
+const contextDir = path.join(rootDir, 'context');
+const guardrailsDir = path.join(contextDir, 'guardrails');
 const outputPath = path.join(rootDir, 'PromptContext.gs');
 
 function readDirMarkdown(dirPath) {
   if (!fs.existsSync(dirPath)) return '';
-  const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
+  const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md')).sort();
   return files.map(file => {
     const filePath = path.join(dirPath, file);
     const content = fs.readFileSync(filePath, 'utf8');
@@ -28,10 +31,26 @@ function escapeForJsTemplate(str) {
 
 function syncContext() {
   const guardrailsContent = readDirMarkdown(guardrailsDir);
-  const cfmContent = readDirMarkdown(cfmDir);
 
-  const fileContent = `/**
- * Auto-generated from context/guardrails/ and context/cfm/ by scripts/sync-context.js
+  // Dynamically scan for all product directories in context/
+  const entries = fs.readdirSync(contextDir, { withFileTypes: true });
+  const productDirs = entries
+    .filter(e => e.isDirectory() && e.name !== 'guardrails' && !e.name.startsWith('.'))
+    .map(e => e.name);
+
+  const productContexts = {};
+  productDirs.forEach(dirName => {
+    const dirPath = path.join(contextDir, dirName);
+    const content = readDirMarkdown(dirPath);
+    if (content.trim()) {
+      productContexts[dirName.toUpperCase()] = content;
+    }
+  });
+
+  const availableProductsList = Object.keys(productContexts);
+
+  let fileContent = `/**
+ * Auto-generated from context/ by scripts/sync-context.js
  * DO NOT EDIT DIRECTLY. Update markdown files in context/ and run:
  *   node scripts/sync-context.js
  */
@@ -44,10 +63,51 @@ function getGuardrailsMarkdown_() {
 }
 
 /**
- * Returns OSTTRA Cash Flow Management (CFM) capabilities, narratives, and glossary.
+ * List of registered product codes with domain context.
+ */
+function getAvailableProductContexts_() {
+  return ${JSON.stringify(availableProductsList)};
+}
+
+/**
+ * Returns product-specific context for a requested product code or name.
+ * Resolves standard aliases (e.g. CFM, ETD, Cashflows, Futures & Options).
+ */
+function getProductContextMarkdown_(productName) {
+  var key = String(productName || 'CFM').toUpperCase().trim();
+
+  // Alias normalization
+  if (key.indexOf('CASH') !== -1 || key.indexOf('CFM') !== -1) {
+    key = 'CFM';
+  } else if (key.indexOf('ETD') !== -1 || key.indexOf('FUTUR') !== -1 || key.indexOf('OPTION') !== -1 || key.indexOf('EXCHANGE') !== -1) {
+    key = 'ETD';
+  }
+
+  var contexts = {
+`;
+
+  availableProductsList.forEach((prodKey, index) => {
+    const isLast = index === availableProductsList.length - 1;
+    fileContent += `    ${JSON.stringify(prodKey)}: ${escapeForJsTemplate(productContexts[prodKey])}${isLast ? '' : ','}\n`;
+  });
+
+  fileContent += `  };
+
+  return contexts[key] || contexts['CFM'] || '';
+}
+
+/**
+ * Backwards-compatible alias for Cash Flow Management (CFM) context.
  */
 function getCfmContextMarkdown_() {
-  return ${escapeForJsTemplate(cfmContent)};
+  return getProductContextMarkdown_('CFM');
+}
+
+/**
+ * Backwards-compatible alias for Exchange Traded Derivatives (ETD) context.
+ */
+function getEtdContextMarkdown_() {
+  return getProductContextMarkdown_('ETD');
 }
 
 /**
@@ -56,17 +116,10 @@ function getCfmContextMarkdown_() {
 function getTranslationRulesMarkdown_() {
   return getGuardrailsMarkdown_();
 }
-
-/**
- * Backwards-compatible alias for product context (defaults to CFM).
- */
-function getProductContextMarkdown_() {
-  return getCfmContextMarkdown_();
-}
 `;
 
   fs.writeFileSync(outputPath, fileContent, 'utf8');
-  console.log('Successfully generated PromptContext.gs from context/guardrails/ and context/cfm/');
+  console.log(`Successfully generated PromptContext.gs with ${availableProductsList.length} product(s): ${availableProductsList.join(', ')}`);
 }
 
 syncContext();
