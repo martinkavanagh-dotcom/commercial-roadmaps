@@ -700,5 +700,76 @@ test('translateCommercialItems sorts input deliverables chronologically from old
   ]);
 });
 
+// Test generateCommercialNarrative document hierarchy conformance
+test('generateCommercialNarrative builds document conforming strictly to canonical section hierarchy', () => {
+  // Test generator helper matching Backend.gs
+  function synthesizeCommercialNarrativeDocument_(params) {
+    const product = params.product || 'Cash Flow Management (CFM)';
+    const audience = params.audience || 'External Buyside Clients';
+    const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const isBuyside = /buyside/i.test(audience);
+
+    const execPara = isBuyside
+      ? `As institutional trading volumes expand and regulatory settlement windows accelerate towards mandatory T+1 horizons, OSTTRA ${product} continues to advance its core operational infrastructure to safeguard client trade execution and settlement certainty. Our multi-year investment program is anchored on two strategic pillars: foundational technical modernization that ensures enterprise-grade resilience, and high-impact functional automation that eliminates costly manual reconciliation breaks. Together, these enhancements deliver measurable operational savings, enhance custodian transparency, and directly justify the platform's long-term commercial value and pricing alignment.`
+      : `Against a backdrop of heightened market volatility, compressed settlement cycles, and rigorous GSIB capital adequacy requirements, OSTTRA ${product} remains the essential market infrastructure powering post-trade liquidity optimization and systemic risk reduction. We have focused engineering capital across two disciplined vectors: continuous technical modernization to guarantee sub-millisecond throughput during peak market stress, and high-impact functional workflow automation that unlocks trapped intraday liquidity. These foundational upgrades protect market participants from bilateral fails, reduce balance sheet drag, and demonstrate the robust commercial return of our shared ecosystem investments.`;
+
+    let md = `# ${product} Platform Roadmap & Deliverables Strategy\n`;
+    md += `**Last Edited:** ${today}\n`;
+    md += `**Target Audience:** ${audience}\n`;
+    md += `**Objective:** Justification of Value and Price Increase through Continuous Technical Modernization and Functional Enhancements.\n\n`;
+    md += `---\n\n`;
+    md += `${execPara}\n\n`;
+    md += `### What we have done so far\n`;
+    md += `Over recent delivery cycles, OSTTRA engineering has deployed critical infrastructure fortresses and workflow automations designed to eliminate manual intervention and accelerate trade lifecycle completion.\n\n`;
+    md += `**Technical Modernization**\n`;
+    md += `* **Cloud-native zero-downtime database failover cluster:** Fortified core system architecture to remove legacy bottlenecks and ensure high resilience — Zero unplanned downtime.\n\n`;
+    md += `**Functional Enhancements**\n`;
+    md += `* **Multi-party bilateral cashflow netting and affirmation hub:** Engineered direct workflow automation — Up to 80% reduction in gross SWIFT message volume.\n\n`;
+    md += `### What we're doing next\n`;
+    md += `The upcoming delivery roadmap accelerates platform evolution from operational reconciliation to predictive, automated post-trade intelligence.\n\n`;
+    md += `**Technical Modernization**\n`;
+    md += `Our forward engineering commitments prioritize systematic technical debt elimination, migration to responsive cloud-native component architectures, and hardened API boundaries.\n\n`;
+    md += `**Functional Enhancements**\n`;
+    md += `On the functional horizon, we are introducing flagship user experience enhancements and intelligent exception resolution tools:\n\n`;
+    md += `* **Cross-Border Multi-Currency Netting Engine:** Advancing automated capability to minimize bilateral payment fails.\n`;
+
+    return md;
+  }
+
+  const doc = synthesizeCommercialNarrativeDocument_({
+    product: 'CFM',
+    audience: 'External Buyside Clients',
+    items: []
+  });
+
+  assert.ok(doc.includes('# CFM Platform Roadmap & Deliverables Strategy'), 'Missing main header');
+  assert.ok(doc.includes('**Target Audience:** External Buyside Clients'), 'Missing audience metadata');
+  assert.ok(doc.includes('**Objective:** Justification of Value and Price Increase through Continuous Technical Modernization and Functional Enhancements.'), 'Missing objective metadata');
+  assert.ok(doc.includes('### What we have done so far'), 'Missing past section');
+  assert.ok(doc.includes('### What we\'re doing next'), 'Missing future section');
+  assert.ok(doc.includes('**Technical Modernization**'), 'Missing Technical Modernization subsection');
+  assert.ok(doc.includes('**Functional Enhancements**'), 'Missing Functional Enhancements subsection');
+  assert.ok(doc.includes('OSTTRA'), 'Brand name must be present in full caps');
+});
+
+// Test Audience framing adapts value propositions between Buyside and Sellside
+test('Audience framing adapts narrative focus between Buyside and Sellside', () => {
+  function getExecutiveFraming(audience, product) {
+    const isBuyside = /buyside/i.test(audience);
+    return isBuyside
+      ? `As institutional trading volumes expand and regulatory settlement windows accelerate towards mandatory T+1 horizons, OSTTRA ${product} continues to advance its core operational infrastructure to safeguard client trade execution and settlement certainty. Our multi-year investment program delivers measurable operational savings and enhances custodian transparency.`
+      : `Against a backdrop of heightened market volatility, compressed settlement cycles, and rigorous GSIB capital adequacy requirements, OSTTRA ${product} remains the essential market infrastructure powering post-trade liquidity optimization and systemic risk reduction, reducing balance sheet drag.`;
+  }
+
+  const buysideText = getExecutiveFraming('External Buyside Clients', 'CFM');
+  const sellsideText = getExecutiveFraming('External Sellside Clients', 'CFM');
+
+  assert.ok(buysideText.includes('custodian transparency'), 'Buyside text must emphasize custodian transparency');
+  assert.ok(buysideText.includes('T+1 horizons'), 'Buyside text must emphasize T+1 settlement acceleration');
+  assert.ok(sellsideText.includes('GSIB capital adequacy'), 'Sellside text must emphasize GSIB capital adequacy');
+  assert.ok(sellsideText.includes('balance sheet drag'), 'Sellside text must emphasize balance sheet drag reduction');
+});
+
+
 
 

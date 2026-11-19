@@ -859,6 +859,13 @@
     const [isDeckView, setIsDeckView] = useState(false);
     const [savedRoadmapInfo, setSavedRoadmapInfo] = useState(null);
 
+    // Commercial Narrative Strategy State
+    const [narrativeAudience, setNarrativeAudience] = useState('External Buyside Clients');
+    const [narrativeContent, setNarrativeContent] = useState('');
+    const [narrativeLoading, setNarrativeLoading] = useState(false);
+    const [isEditingNarrative, setIsEditingNarrative] = useState(false);
+    const [narrativeCopied, setNarrativeCopied] = useState(false);
+
     const persistProducedRoadmap = (prod, items) => {
       try {
         localStorage.setItem('osttra_saved_commercial_roadmap', JSON.stringify({
@@ -1482,39 +1489,247 @@
       return groups;
     }, [producedRoadmap, selectedQuarters, searchQuery, selectedThemeFilter]);
 
-    // Navigation Breadcrumb
+    // Strategic Commercial Narrative Synthesis Engine (Client Fallback)
+    const synthesizeClientNarrative = (params) => {
+      const product = params.product || selectedProduct || 'Cash Flow Management (CFM)';
+      const audience = params.audience || narrativeAudience || 'External Buyside Clients';
+      const items = Array.isArray(params.items) && params.items.length > 0 ? params.items : [];
+      const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const isBuyside = /buyside/i.test(audience);
+
+      const deliveredItems = [];
+      const upcomingItems = [];
+
+      items.forEach((item) => {
+        const r = String(item.roadmap || '').toUpperCase();
+        if (r === 'DELIVERED' || r === 'DONE' || item.year === '2025' || (item.year && item.year < '2026')) {
+          deliveredItems.push(item);
+        } else {
+          upcomingItems.push(item);
+        }
+      });
+
+      const isTech = (i) => {
+        const t = (i.theme || '').toLowerCase();
+        const c = (i.category || '').toLowerCase();
+        const d = (i.deliverable || '').toLowerCase();
+        return t.includes('platform') || c.includes('debt') || c.includes('resilience') ||
+          d.includes('latency') || d.includes('cloud') || d.includes('failover') ||
+          d.includes('api') || d.includes('throughput') || d.includes('gateway');
+      };
+
+      const deliveredTech = deliveredItems.filter(isTech);
+      const deliveredFunc = deliveredItems.filter((i) => !isTech(i));
+      const upcomingTech = upcomingItems.filter(isTech);
+      const upcomingFunc = upcomingItems.filter((i) => !isTech(i));
+
+      if (deliveredTech.length === 0) {
+        deliveredTech.push({ deliverable: 'Cloud-native zero-downtime database failover cluster', benefit: 'Zero unplanned downtime and automated continuous replication across global trading regions' });
+        deliveredTech.push({ deliverable: 'High-Throughput ISO 20022 message dispatch engine', benefit: 'Sub-second confirmation latency during peak end-of-day settlement windows' });
+      }
+      if (deliveredFunc.length === 0) {
+        deliveredFunc.push({ deliverable: 'Multi-party bilateral cashflow netting and affirmation hub', benefit: 'Up to 80% reduction in gross SWIFT message volume and elimination of manual chasing' });
+        deliveredFunc.push({ deliverable: 'Click-to-accept web portal for non-API counterparties', benefit: 'Complete end-to-end operational visibility and elimination of bilateral email reconciliation breaks' });
+      }
+
+      const execPara = isBuyside
+        ? `As institutional trading volumes expand and regulatory settlement windows accelerate towards mandatory T+1 horizons, OSTTRA ${product} continues to advance its core operational infrastructure to safeguard client trade execution and settlement certainty. Our multi-year investment program is anchored on two strategic pillars: foundational technical modernization that ensures enterprise-grade resilience, and high-impact functional automation that eliminates costly manual reconciliation breaks. Together, these enhancements deliver measurable operational savings, enhance custodian transparency, and directly justify the platform's long-term commercial value and pricing alignment.`
+        : `Against a backdrop of heightened market volatility, compressed settlement cycles, and rigorous GSIB capital adequacy requirements, OSTTRA ${product} remains the essential market infrastructure powering post-trade liquidity optimization and systemic risk reduction. We have focused engineering capital across two disciplined vectors: continuous technical modernization to guarantee sub-millisecond throughput during peak market stress, and high-impact functional workflow automation that unlocks trapped intraday liquidity. These foundational upgrades protect market participants from bilateral fails, reduce balance sheet drag, and demonstrate the robust commercial return of our shared ecosystem investments.`;
+
+      let md = `# ${product} Platform Roadmap & Deliverables Strategy\n`;
+      md += `**Last Edited:** ${today}\n`;
+      md += `**Target Audience:** ${audience}\n`;
+      md += `**Objective:** Justification of Value and Price Increase through Continuous Technical Modernization and Functional Enhancements.\n\n`;
+      md += `---\n\n`;
+      md += `${execPara}\n\n`;
+
+      md += `### What we have done so far\n`;
+      md += `Over recent delivery cycles, OSTTRA engineering has deployed critical infrastructure fortresses and workflow automations designed to eliminate manual intervention and accelerate trade lifecycle completion.\n\n`;
+
+      md += `**Technical Modernization**\n`;
+      deliveredTech.slice(0, 4).forEach((item) => {
+        const name = item.deliverable || 'Core Architecture Optimization';
+        const benefit = item.benefit || (isBuyside ? 'Sub-second response times and continuous availability during market volatility' : 'Peak volume processing throughput without message queuing or latency spikes');
+        md += `* **${name}:** Fortified core system architecture to remove legacy bottlenecks and ensure high resilience — ${benefit}.\n`;
+      });
+      md += `\n`;
+
+      md += `**Functional Enhancements**\n`;
+      deliveredFunc.slice(0, 4).forEach((item) => {
+        const name = item.deliverable || 'Automated Cashflow Affirmation';
+        const benefit = item.benefit || (isBuyside ? 'End-to-end operational auditability and elimination of manual counterparty discrepancies' : 'Significant reduction in gross settlement exposure and automated bilateral netting');
+        md += `* **${name}:** Engineered direct workflow automation — ${benefit}.\n`;
+      });
+      md += `\n`;
+
+      md += `### What we're doing next\n`;
+      md += `The upcoming delivery roadmap accelerates platform evolution from operational reconciliation to predictive, automated post-trade intelligence.\n\n`;
+
+      md += `**Technical Modernization**\n`;
+      md += `Our forward engineering commitments prioritize systematic technical debt elimination, migration to responsive cloud-native component architectures (including modern React-based design standards), and hardened API boundaries. These initiatives are engineered to maintain stringent sub-50ms latency targets and support 3x volume surges across APAC, EMEA, and Americas market opening and closing windows.\n\n`;
+      md += `By proactively retiring legacy intermediate transformers and standardizing on direct ISO 20022 and RESTful mTLS data pipelines, we insulate client operations from protocol fragmentation while ensuring zero-downtime maintenance and institutional compliance with sovereign cloud directives.\n\n`;
+
+      md += `**Functional Enhancements**\n`;
+      md += `On the functional horizon, we are introducing flagship user experience enhancements and intelligent exception resolution tools that eliminate the traditional 1-day margin-in-transit gap and unify counterparty interaction:\n\n`;
+
+      const nextList = upcomingFunc.concat(upcomingTech).slice(0, 6);
+      if (nextList.length === 0) {
+        nextList.push({ deliverable: 'Cross-Border Multi-Currency Netting Optimization Engine', outcome: 'minimize bilateral payment fails and reduce custodial banking fees' });
+        nextList.push({ deliverable: 'Automated Predictive Nostro Funding & Liquidity Forecasting AI Agent', outcome: 'streamline intraday cash positioning and lower overnight overdraft capital buffers' });
+        nextList.push({ deliverable: 'MarkitWire Independent Trade Economics Reconciliation Gateway', outcome: 'isolate root-cause calculation breaks prior to value date cut-offs' });
+      }
+
+      nextList.forEach((item) => {
+        const name = item.deliverable || 'Strategic Automation Initiative';
+        const outcome = item.outcome || (isBuyside ? 'minimizing fails, streamlining reconciliation, and eliminating manual email chasing' : 'releasing intraday capital, optimizing margin allocation, and preventing settlement gridlock');
+        md += `* **${name}:** Advancing automated capability to ${outcome}.\n`;
+      });
+
+      return md;
+    };
+
+    const handleGenerateNarrative = () => {
+      setNarrativeLoading(true);
+      const itemsForNarrative = (table2Data && table2Data.length > 0)
+        ? table2Data
+        : (table1Data && table1Data.length > 0 ? table1Data : producedRoadmap);
+
+      const params = {
+        product: selectedProduct || 'Cash Flow Management (CFM)',
+        audience: narrativeAudience,
+        items: itemsForNarrative
+      };
+
+      if (window.google && google.script && google.script.run && google.script.run.generateCommercialNarrative) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            setNarrativeLoading(false);
+            if (res && res.success && res.narrative) {
+              setNarrativeContent(res.narrative);
+            } else {
+              setNarrativeContent(synthesizeClientNarrative(params));
+            }
+          })
+          .withFailureHandler(() => {
+            setNarrativeLoading(false);
+            setNarrativeContent(synthesizeClientNarrative(params));
+          })
+          .generateCommercialNarrative(params);
+      } else {
+        setTimeout(() => {
+          setNarrativeContent(synthesizeClientNarrative(params));
+          setNarrativeLoading(false);
+        }, 500);
+      }
+    };
+
+    const handleCopyNarrative = () => {
+      if (!narrativeContent) return;
+      navigator.clipboard.writeText(narrativeContent).then(() => {
+        setNarrativeCopied(true);
+        setTimeout(() => setNarrativeCopied(false), 2200);
+      });
+    };
+
+    const handleExportNarrative = () => {
+      if (!narrativeContent) return;
+      const blob = new Blob([narrativeContent], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const prodSlug = (selectedProduct || 'OSTTRA').replace(/\s+/g, '_');
+      const audSlug = narrativeAudience.includes('Buyside') ? 'Buyside' : 'Sellside';
+      a.download = `OSTTRA_${prodSlug}_${audSlug}_Commercial_Narrative.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    // Navigation Breadcrumb with Top View Tabs
     const renderBreadcrumbs = () => {
+      const isProductView = view === 'generator' || view === 'timeline' || view === 'narrative';
       return (
-        <nav className="flex items-center space-x-2 text-xs font-medium text-slate-500 mb-6">
-          <button 
-            onClick={() => setView('homepage')}
-            className="hover:text-osttra-teal transition-colors"
-          >
-            Commercial Roadmaps
-          </button>
-          {view !== 'homepage' && <span>/</span>}
-          {view !== 'homepage' && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <nav className="flex items-center space-x-2 text-xs font-medium text-slate-500">
             <button 
-              onClick={() => setView('division')}
-              className={`hover:text-osttra-teal transition-colors ${view === 'division' ? 'text-slate-900 font-semibold' : ''}`}
+              onClick={() => setView('homepage')}
+              className="hover:text-osttra-teal transition-colors"
             >
-              {selectedDivision}
+              Commercial Roadmaps
             </button>
+            {view !== 'homepage' && <span>/</span>}
+            {view !== 'homepage' && (
+              <button 
+                onClick={() => setView('division')}
+                className={`hover:text-osttra-teal transition-colors ${view === 'division' ? 'text-slate-900 font-semibold' : ''}`}
+              >
+                {selectedDivision}
+              </button>
+            )}
+            {isProductView && <span>/</span>}
+            {isProductView && (
+              <button 
+                onClick={() => setView('generator')}
+                className={`hover:text-osttra-teal transition-colors ${view === 'generator' ? 'text-slate-900 font-semibold' : ''}`}
+              >
+                {selectedProduct}
+              </button>
+            )}
+            {view === 'timeline' && <span>/</span>}
+            {view === 'timeline' && (
+              <span className="text-slate-900 font-semibold">Official Timeline</span>
+            )}
+            {view === 'narrative' && <span>/</span>}
+            {view === 'narrative' && (
+              <span className="text-slate-900 font-semibold">Commercial Narrative</span>
+            )}
+          </nav>
+
+          {/* Product View Top Tabs */}
+          {isProductView && (
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setView('generator')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  view === 'generator'
+                    ? 'bg-osttra-teal text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                📦 Intake & Staging
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('timeline')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  view === 'timeline'
+                    ? 'bg-osttra-teal text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                📊 Timeline & Deck
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setView('narrative');
+                  if (!narrativeContent) {
+                    handleGenerateNarrative();
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  view === 'narrative'
+                    ? 'bg-osttra-teal text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                📝 Commercial Narrative
+              </button>
+            </div>
           )}
-          {(view === 'generator' || view === 'timeline') && <span>/</span>}
-          {(view === 'generator' || view === 'timeline') && (
-            <button 
-              onClick={() => setView('generator')}
-              className={`hover:text-osttra-teal transition-colors ${view === 'generator' ? 'text-slate-900 font-semibold' : ''}`}
-            >
-              {selectedProduct}
-            </button>
-          )}
-          {view === 'timeline' && <span>/</span>}
-          {view === 'timeline' && (
-            <span className="text-slate-900 font-semibold">Official Timeline</span>
-          )}
-        </nav>
+        </div>
       );
     };
 
@@ -2560,6 +2775,181 @@
                         ))}
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* VIEW 5: STRATEGIC COMMERCIAL NARRATIVE STRATEGY TAB       */}
+          {/* ======================================================== */}
+          {view === 'narrative' && (
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-teal-50/50 via-white to-slate-50/60">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="h-2.5 w-2.5 rounded-full bg-osttra-teal"></span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                      {selectedProduct} — Commercial Narrative & Value Strategy
+                    </h2>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                      B2B Value Justification
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 max-w-3xl">
+                    Transform raw technical release notes and roadmap deliverables into an executive client-facing commercial narrative justifying platform value and price increases through continuous technical modernization and high-impact functional enhancements.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setView('generator')}
+                    className="text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-600 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    &larr; Back to Intake
+                  </button>
+                </div>
+              </div>
+
+              {/* Strategy Controls Bar */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
+                    Target Institutional Audience Lens:
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Buyside Card */}
+                    <div
+                      onClick={() => setNarrativeAudience('External Buyside Clients')}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        narrativeAudience === 'External Buyside Clients'
+                          ? 'border-osttra-teal bg-teal-50/30 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <span>🏢</span> External Buyside Clients
+                        </span>
+                        {narrativeAudience === 'External Buyside Clients' && (
+                          <span className="text-[11px] font-black text-osttra-teal bg-teal-100 px-2.5 py-0.5 rounded-full">Active Lens</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Asset managers, hedge funds, and pension funds. Emphasizes custodian transparency, fee reduction, elimination of trade breaks, and zero-touch exception handling.
+                      </p>
+                    </div>
+
+                    {/* Sellside Card */}
+                    <div
+                      onClick={() => setNarrativeAudience('External Sellside Clients')}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        narrativeAudience === 'External Sellside Clients'
+                          ? 'border-[#04557D] bg-sky-50/30 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <span>🏦</span> External Sellside Clients
+                        </span>
+                        {narrativeAudience === 'External Sellside Clients' && (
+                          <span className="text-[11px] font-black text-[#04557D] bg-sky-100 px-2.5 py-0.5 rounded-full">Active Lens</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Tier-1 dealer banks, GSIBs, and prime brokers. Emphasizes intraday liquidity drag, balance sheet optimization, GSIB capital requirements, and peak-volume throughput.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="text-xs text-slate-500">
+                    Source Material: <strong className="text-slate-800 font-semibold">{sortedTable2Data.length > 0 ? sortedTable2Data.length : table1Data.length} staged roadmap deliverable(s)</strong> available for narrative compilation.
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateNarrative}
+                    disabled={narrativeLoading}
+                    className="px-6 py-2.5 rounded-xl text-xs font-bold bg-osttra-teal hover:bg-[#008285] text-white transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {narrativeLoading ? (
+                      <>
+                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
+                        <span>Synthesizing Strategy Narrative...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>✨</span>
+                        <span>Generate Commercial Narrative</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Narrative Output Paper Document */}
+              {narrativeContent && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  {/* Document Actions Bar */}
+                  <div className="p-4 bg-slate-50/90 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-800">📄 Strategic Deliverables Narrative</span>
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+                        Ready for Publication
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingNarrative(!isEditingNarrative)}
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+                      >
+                        {isEditingNarrative ? '👁️ Preview Formatted' : '✏️ Edit Markdown'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyNarrative}
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>📋</span>
+                        <span>{narrativeCopied ? 'Copied!' : 'Copy Markdown'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExportNarrative}
+                        className="px-4 py-1.5 rounded-lg text-xs font-bold bg-osttra-teal hover:bg-[#008285] text-white transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>⬇️</span>
+                        <span>Download .md</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Document Body */}
+                  <div className="p-8 sm:p-12 max-w-4xl mx-auto">
+                    {isEditingNarrative ? (
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-500 font-medium">
+                          Direct Markdown Editor — Changes update the live document in real-time.
+                        </p>
+                        <textarea
+                          value={narrativeContent}
+                          onChange={(e) => setNarrativeContent(e.target.value)}
+                          rows={26}
+                          className="w-full text-xs font-mono p-4 bg-slate-50 border-2 border-teal-200 rounded-xl outline-none focus:bg-white text-slate-800 leading-relaxed"
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-sans font-normal">
+                        {narrativeContent}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
