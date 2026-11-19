@@ -501,3 +501,154 @@ test('Multi-year filtering allows selecting multiple years (e.g. 2026 and 2027) 
   assert.deepEqual(filtered.map(i => i.key), ['CFM-101', 'CFM-102']);
 });
 
+// Test transformPrfToCommercial_ preserves year property
+test('transformPrfToCommercial_ preserves item year property across commercial staging', () => {
+  function extractYear_(val) {
+    if (!val) return '';
+    const match = String(val).match(/\b(202[4-9]|203[0-5])\b/);
+    return match ? match[1] : '';
+  }
+
+  function transformPrfToCommercial_(item) {
+    return {
+      id: 'STG-' + item.id,
+      deliverable: item.deliverable,
+      roadmap: item.roadmap,
+      year: item.year || extractYear_(item.roadmap) || '2026'
+    };
+  }
+
+  const item2026 = { id: 'CFM-101', deliverable: 'Netting', roadmap: 'Q1', year: '2026' };
+  const item2027 = { id: 'CFM-102', deliverable: 'Multilateral', roadmap: '2027 Q2' };
+  const itemDefault = { id: 'CFM-103', deliverable: 'Fallback', roadmap: 'Q3' };
+
+  assert.equal(transformPrfToCommercial_(item2026).year, '2026');
+  assert.equal(transformPrfToCommercial_(item2027).year, '2027');
+  assert.equal(transformPrfToCommercial_(itemDefault).year, '2026');
+});
+
+// Test getHorizonKey year-aware horizon routing
+test('getHorizonKey correctly routes multi-year deliverables into appropriate horizons', () => {
+  function getHorizonKey(item) {
+    const yr = item && item.year ? parseInt(item.year, 10) : 2026;
+    const r = String((item && item.roadmap) || '').trim().toLowerCase();
+
+    // Future years (2027+)
+    if (yr > 2026) {
+      if (yr === 2027 && (r === 'q1' || r.includes('q1'))) return 'next';
+      return 'later';
+    }
+
+    // Past years (e.g. 2025 or earlier)
+    if (yr < 2026) {
+      return 'now';
+    }
+
+    // Current year (2026)
+    if (r === 'now' || r === 'q4' || r === 'q1' || r === 'delivered' || r.includes('now')) return 'now';
+    if (r === 'next' || r === 'q2' || r === 'q3' || r.includes('next')) return 'next';
+    if (r === 'later' || r === 'bl' || r === 'backlog' || r.includes('later') || r.includes('plan')) return 'later';
+    return 'now';
+  }
+
+  // 2026 items
+  assert.equal(getHorizonKey({ year: '2026', roadmap: 'Q1' }), 'now', '2026 Q1 should route to now');
+  assert.equal(getHorizonKey({ year: '2026', roadmap: 'Q2' }), 'next', '2026 Q2 should route to next');
+  assert.equal(getHorizonKey({ year: '2026', roadmap: 'BL' }), 'later', '2026 BL should route to later');
+
+  // 2027 items: Q1 routes to next horizon, subsequent quarters route to later
+  assert.equal(getHorizonKey({ year: '2027', roadmap: 'Q1' }), 'next', '2027 Q1 should route to next');
+  assert.equal(getHorizonKey({ year: '2027', roadmap: 'Q2' }), 'later', '2027 Q2 should route to later');
+  assert.equal(getHorizonKey({ year: '2027', roadmap: 'Q4' }), 'later', '2027 Q4 should route to later');
+
+  // 2028+ items always route to later
+  assert.equal(getHorizonKey({ year: '2028', roadmap: 'Q1' }), 'later', '2028 Q1 should route to later');
+});
+
+// Test Chronological year grouping and quarter sorting for Table 1 intake
+test('Chronological year grouping separates deliverables into distinct year containers and sorts by quarter order', () => {
+  const QUARTER_SORT_ORDER = {
+    'DELIVERED': 0,
+    'Q1': 1,
+    'Q2': 2,
+    'Q3': 3,
+    'Q4': 4,
+    'BL': 5,
+    'BACKLOG': 5,
+    'PENDING SCHEDULING': 6
+  };
+
+  const rawItems = [
+    { id: '1', year: '2027', roadmap: 'Q3', deliverable: '2027 Q3 Item' },
+    { id: '2', year: '2026', roadmap: 'Q4', deliverable: '2026 Q4 Item' },
+    { id: '3', year: '2027', roadmap: 'Q1', deliverable: '2027 Q1 Item' },
+    { id: '4', year: '2026', roadmap: 'Q1', deliverable: '2026 Q1 Item' },
+    { id: '5', year: '2026', roadmap: 'Delivered', deliverable: '2026 Live Item' },
+    { id: '6', year: '2027', roadmap: 'BL', deliverable: '2027 Backlog Item' }
+  ];
+
+  // Emulate table1ByYear grouping logic
+  const groups = {};
+  rawItems.forEach((item) => {
+    const yr = item.year || '2026';
+    if (!groups[yr]) groups[yr] = [];
+    groups[yr].push(item);
+  });
+
+  const sortedYears = Object.keys(groups).sort();
+  const table1ByYear = {};
+  sortedYears.forEach((yr) => {
+    table1ByYear[yr] = groups[yr].slice().sort((a, b) => {
+      const qA = (a.roadmap || 'BL').toUpperCase();
+      const qB = (b.roadmap || 'BL').toUpperCase();
+      const orderA = QUARTER_SORT_ORDER[qA] !== undefined ? QUARTER_SORT_ORDER[qA] : 99;
+      const orderB = QUARTER_SORT_ORDER[qB] !== undefined ? QUARTER_SORT_ORDER[qB] : 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.jiraKey || a.id).localeCompare(b.jiraKey || b.id);
+    });
+  });
+
+  assert.deepEqual(sortedYears, ['2026', '2027'], 'Years should be sorted chronologically');
+  assert.equal(table1ByYear['2026'].length, 3);
+  assert.equal(table1ByYear['2027'].length, 3);
+
+  // Check 2026 order: Delivered (0) -> Q1 (1) -> Q4 (4)
+  assert.deepEqual(table1ByYear['2026'].map(i => i.roadmap), ['Delivered', 'Q1', 'Q4']);
+
+  // Check 2027 order: Q1 (1) -> Q3 (3) -> BL (5)
+  assert.deepEqual(table1ByYear['2027'].map(i => i.roadmap), ['Q1', 'Q3', 'BL']);
+
+  // Test year-specific toggle
+  const selectedIds = new Set();
+  const toggleYearSelectAll = (year) => {
+    const yearItems = table1ByYear[year] || [];
+    const yearItemIds = yearItems.map(i => i.id);
+    const allSelected = yearItemIds.length > 0 && yearItemIds.every(id => selectedIds.has(id));
+    if (allSelected) {
+      yearItemIds.forEach(id => selectedIds.delete(id));
+    } else {
+      yearItemIds.forEach(id => selectedIds.add(id));
+    }
+  };
+
+  // Select 2026 only
+  toggleYearSelectAll('2026');
+  assert.equal(selectedIds.size, 3);
+  assert.ok(selectedIds.has('2'));
+  assert.ok(selectedIds.has('4'));
+  assert.ok(selectedIds.has('5'));
+  assert.ok(!selectedIds.has('1'), '2027 items should not be selected when selecting 2026');
+
+  // Toggle 2027 on
+  toggleYearSelectAll('2027');
+  assert.equal(selectedIds.size, 6, 'All items across both years should be selected now');
+
+  // Deselect 2026 only
+  toggleYearSelectAll('2026');
+  assert.equal(selectedIds.size, 3, 'Only 2027 items should remain selected');
+  assert.ok(selectedIds.has('1'));
+  assert.ok(selectedIds.has('3'));
+  assert.ok(selectedIds.has('6'));
+});
+
+
