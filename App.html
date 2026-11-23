@@ -1029,12 +1029,27 @@
 
             // ETD Products - 2027 Strategic Horizon
             { id: 'PRF-ETD-011', product: 'ETD', roadmap: 'Q1', year: '2027', deliverable: 'Next-gen global exchange unified order routing protocol v3', category: 'Strategic', theme: 'Market Expansion', jiraKey: 'ETD-1350' },
-            { id: 'PRF-ETD-012', product: 'ETD', roadmap: 'Q2', year: '2027', deliverable: 'Ultra-low latency FPGA-accelerated risk limit pre-trade checker', category: 'Tech Debt', theme: 'Performance & Connectivity', jiraKey: 'ETD-1380' }
+            { id: 'PRF-ETD-012', product: 'ETD', roadmap: 'Q2', year: '2027', deliverable: 'Ultra-low latency FPGA-accelerated risk limit pre-trade checker', category: 'Tech Debt', theme: 'Performance & Connectivity', jiraKey: 'ETD-1380' },
+
+            // Rates Products (OSTTRA Connect for Rates / MarkitWire)
+            { id: 'PRF-RATES-001', product: 'Rates', roadmap: 'Q4', year: '2025', deliverable: 'Modernize RESTful and WebSocket API endpoints for high-throughput IRS trade affirmation', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-101' },
+            { id: 'PRF-RATES-002', product: 'Rates', roadmap: 'Q4', year: '2025', deliverable: 'Automated LCH SwapClear and CME clearing trade submission with sub-second callbacks', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-102' },
+            { id: 'PRF-RATES-003', product: 'Rates', roadmap: 'Q1', year: '2026', deliverable: 'Real-time Netting Sync API feed for CCP compression and bank risk architecture alignment', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'RATES-103' },
+            { id: 'PRF-RATES-004', product: 'Rates', roadmap: 'Q1', year: '2026', deliverable: 'Clearing Compliance Timing Reports benchmarking trade clearing velocity against G15 dealer peers', category: 'Operational Efficiency', theme: 'Functional & Usability', jiraKey: 'RATES-104' },
+            { id: 'PRF-RATES-005', product: 'Rates', roadmap: 'Q2', year: '2026', deliverable: 'Enhanced cross-currency swaps automated clearing routing to global CCPs', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-105' },
+            { id: 'PRF-RATES-006', product: 'Rates', roadmap: 'Q2', year: '2026', deliverable: 'Bunched order block allocation delivery engine for asset managers with child fund splits', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-106' },
+            { id: 'PRF-RATES-007', product: 'Rates', roadmap: 'Q3', year: '2026', deliverable: 'Multi-regime regulatory reporting engine for CFTC, EMIR, and JFSA trade repository feeds', category: 'Regulatory', theme: 'Functional & Usability', jiraKey: 'RATES-107' },
+            { id: 'PRF-RATES-008', product: 'Rates', roadmap: 'Q3', year: '2026', deliverable: 'Cloud-native zero-downtime infrastructure migration for peak market volatility resilience', category: 'Tech Debt', theme: 'Platform Enhancements', jiraKey: 'RATES-108' },
+            { id: 'PRF-RATES-009', product: 'Rates', roadmap: 'BL', year: '2026', deliverable: 'Intelligent AI-assisted contract diagnostics and anomaly detection for bespoke structured rates', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-109' },
+            { id: 'PRF-RATES-010', product: 'Rates', roadmap: 'Delivered', year: '2025', deliverable: 'Universal trade affirmation and legally binding ISDA electronic confirmation engine', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-100' },
+            { id: 'PRF-RATES-011', product: 'Rates', roadmap: 'Q1', year: '2027', deliverable: 'Unified fixed income post-trade convergence connecting OTC rate swaps and repo clearing rails', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-110' },
+            { id: 'PRF-RATES-012', product: 'Rates', roadmap: 'Q2', year: '2027', deliverable: 'Automated benchmark transition fallback rules engine for global index replacements', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-111' }
           ];
           const filtered = mockItems.filter((item) => {
             const prodMatch = !selectedProduct ||
               item.product.toUpperCase() === selectedProduct.toUpperCase() ||
-              (selectedProduct === 'CFM' && (item.product === 'CFM' || item.product === 'Cashflows'));
+              (selectedProduct === 'CFM' && (item.product === 'CFM' || item.product === 'Cashflows')) ||
+              (selectedProduct.toUpperCase().includes('RATE') && (item.product.toUpperCase().includes('RATE') || item.product.toUpperCase().includes('MARKITWIRE')));
             const itemYear = item.year || '2026';
             const yearMatch = selectedYears.length === 0 || selectedYears.includes(itemYear);
             return prodMatch && yearMatch && selectedQuarters.includes(item.roadmap);
@@ -1177,6 +1192,11 @@
               .replace(/^prf\s*[-#]?\s*\d+\s*[:\-]\s*/i, '')
               .replace(/^\[(bug|task|story|feature|tech debt|enhancement)\]\s*/i, '');
             const lower = t.toLowerCase();
+            if (lower.includes('netting sync') || lower.includes('compression sync')) return { title: 'Real-Time CCP Netting Synchronization & Member Risk Integration Feed', theme: 'Platform Enhancements' };
+            if (lower.includes('cross-currency') || lower.includes('xccy')) return { title: 'Automated Real-Time Cross-Currency Swap Clearing Gateway', theme: 'Connectivity & Coverage' };
+            if (lower.includes('timing report') || lower.includes('clearing compliance')) return { title: 'G15 Peer Clearing Compliance & Velocity Benchmark Analytics Portal', theme: 'Functional & Usability' };
+            if (lower.includes('markitwire') || lower.includes('legal confirmation') || lower.includes('isda')) return { title: 'Authoritative OTC Derivatives Legal Confirmation & Digital ISDA Engine', theme: 'Functional & Usability' };
+            if (lower.includes('swaption') || lower.includes('cms') || lower.includes('irs') || lower.includes('rate swap')) return { title: 'Standardized Interest Rate Derivatives Confirmation & Matching Service', theme: 'Functional & Usability' };
             if (lower.includes('latency') || lower.includes('throughput')) return { title: 'Ultra-Low Latency Execution & High-Throughput Processing Engine', theme: 'Platform Enhancements' };
             if (lower.includes('emir') || lower.includes('refit')) return { title: 'Automated EMIR Refit Regulatory Reporting & Compliance Suite', theme: 'Connectivity & Coverage' };
             if (lower.includes('matching') || lower.includes('affirmation')) return { title: 'Real-Time Trade Affirmation & Automated Matching Gateway', theme: 'Functional & Usability' };
@@ -1855,21 +1875,28 @@
                   </div>
                 </div>
 
-                <div className="card-disabled rounded-2xl p-8 text-center relative overflow-hidden border border-slate-200">
-                  <div className="h-14 w-14 mx-auto rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 font-black text-xl mb-6">
+                <div
+                  onClick={() => {
+                    setSelectedDivision('R&C');
+                    setView('division');
+                  }}
+                  className="card-interactive bg-white rounded-2xl p-8 cursor-pointer text-center relative overflow-hidden group shadow-xs"
+                >
+                  <div className="h-14 w-14 mx-auto rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-osttra-teal font-black text-xl mb-6 group-hover:scale-105 transition-transform">
                     RC
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-500">
+                  <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">
                     R&C
                   </h3>
-                  <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
+                  <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">
                     Rates & Credit
                   </p>
-                  <p className="text-xs text-slate-400 mt-4 leading-relaxed">
-                    IRS processing, credit default swap confirmation, and bilateral lifecycle workflow.
+                  <p className="text-xs text-slate-600 mt-4 leading-relaxed">
+                    IRS processing, electronic legal confirmation, CCP clearing routing, and Netting Sync.
                   </p>
-                  <div className="mt-8 pt-6 border-t border-slate-200/60 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400">
-                    <span>Planned Next Phase</span>
+                  <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-xs font-bold text-osttra-teal">
+                    <span>Enter Division</span>
+                    <span>&rarr;</span>
                   </div>
                 </div>
 
@@ -1918,111 +1945,162 @@
                 </div>
               </div>
 
-              {/* 2-Row Product Grid */}
+              {/* Division Products Grid */}
               <div className="space-y-6">
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Core Production Lines</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div
-                      onClick={() => {
-                        setSelectedProduct('CFM');
-                        setView('generator');
-                      }}
-                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs border-2 border-teal-500/30 flex flex-col justify-between ring-2 ring-teal-500/10"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-osttra-teal text-white">
-                            Live Sync
-                          </span>
-                          <span className="text-xs text-teal-700 font-mono font-bold">ID: CFM-CORE</span>
+                  
+                  {selectedDivision === 'R&C' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div
+                        onClick={() => {
+                          setSelectedProduct('Rates');
+                          setView('generator');
+                        }}
+                        className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs border-2 border-teal-500/30 flex flex-col justify-between ring-2 ring-teal-500/10"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-osttra-teal text-white">
+                              Live Sync
+                            </span>
+                            <span className="text-xs text-teal-700 font-mono font-bold">ID: RATES-CORE</span>
+                          </div>
+                          <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">Rates</h3>
+                          <p className="text-xs font-medium text-slate-500 mt-1">OSTTRA Connect for Rates (MarkitWire)</p>
+                          <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                            Global post-trade processing infrastructure for OTC Interest Rate Derivatives, electronic legal confirmation, CCP clearing routing, and Netting Sync.
+                          </p>
                         </div>
-                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">CFM</h3>
-                        <p className="text-xs font-medium text-slate-500 mt-1">Cash Flow Management</p>
-                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                          Bilateral cash netting, payment affirmation, liquidity optimization, and T+1 compressed settlement acceleration.
-                        </p>
+                        <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                          <span>Commercial Lead: Pete Altero</span>
+                        </div>
                       </div>
-                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
-                        <span>Last updated by: {currentUser} on 11/18/2026</span>
-                      </div>
-                    </div>
 
-                    <div
-                      onClick={() => {
-                        setSelectedProduct('CFD');
-                        setView('generator');
-                      }}
-                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-50 text-osttra-teal border border-teal-200">
-                            Active Product
-                          </span>
-                          <span className="text-xs text-slate-400 font-mono">ID: CFD-01</span>
+                      <div
+                        className="card-disabled rounded-2xl p-6 relative shadow-xs flex flex-col justify-between border border-slate-200"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-400 border border-slate-200">
+                              Planned Next Phase
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono">ID: CDS-01</span>
+                          </div>
+                          <h3 className="card-title text-2xl font-bold text-slate-400">Credit</h3>
+                          <p className="text-xs font-medium text-slate-400 mt-1">Credit Default Swaps & Tranches</p>
+                          <p className="text-xs text-slate-400 mt-3 leading-relaxed">
+                            Single-name CDS and index tranche trade affirmation, bilateral lifecycle processing, and clearing connectivity.
+                          </p>
                         </div>
-                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">CFD</h3>
-                        <p className="text-xs font-medium text-slate-500 mt-1">Contracts For Difference & Synthetic Equities</p>
-                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                          Automated equity swaps, corporate action adjustments, and prime broker execution feeds.
-                        </p>
-                      </div>
-                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
-                        <span>Last updated by: {currentUser} on 11/11/2026</span>
+                        <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                          <span>Phase 3 Roadmap</span>
+                        </div>
                       </div>
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div
+                        onClick={() => {
+                          setSelectedProduct('CFM');
+                          setView('generator');
+                        }}
+                        className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs border-2 border-teal-500/30 flex flex-col justify-between ring-2 ring-teal-500/10"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-osttra-teal text-white">
+                              Live Sync
+                            </span>
+                            <span className="text-xs text-teal-700 font-mono font-bold">ID: CFM-CORE</span>
+                          </div>
+                          <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">CFM</h3>
+                          <p className="text-xs font-medium text-slate-500 mt-1">Cash Flow Management</p>
+                          <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                            Bilateral cash netting, payment affirmation, liquidity optimization, and T+1 compressed settlement acceleration.
+                          </p>
+                        </div>
+                        <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                          <span>Last updated by: {currentUser} on 11/18/2026</span>
+                        </div>
+                      </div>
 
-                    <div
-                      onClick={() => {
-                        setSelectedProduct('ETD');
-                        setView('generator');
-                      }}
-                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs border-2 border-teal-100 flex flex-col justify-between ring-2 ring-teal-500/10"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-osttra-teal text-white">
-                            Primary Roadmap
-                          </span>
-                          <span className="text-xs text-teal-700 font-mono font-bold">ID: ETD-CORE</span>
+                      <div
+                        onClick={() => {
+                          setSelectedProduct('CFD');
+                          setView('generator');
+                        }}
+                        className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-50 text-osttra-teal border border-teal-200">
+                              Active Product
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono">ID: CFD-01</span>
+                          </div>
+                          <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">CFD</h3>
+                          <p className="text-xs font-medium text-slate-500 mt-1">Contracts For Difference & Synthetic Equities</p>
+                          <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                            Automated equity swaps, corporate action adjustments, and prime broker execution feeds.
+                          </p>
                         </div>
-                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">ETD</h3>
-                        <p className="text-xs font-medium text-slate-500 mt-1">Exchange Traded Derivatives</p>
-                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                          Clearing connectivity, SPAN margin microservices, FIX gateway feeds, and post-trade allocation.
-                        </p>
+                        <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                          <span>Last updated by: {currentUser} on 11/11/2026</span>
+                        </div>
                       </div>
-                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
-                        <span>Last updated by: {currentUser} on 11/11/2026</span>
-                      </div>
-                    </div>
 
-                    <div
-                      onClick={() => {
-                        setSelectedProduct('TRM');
-                        setView('generator');
-                      }}
-                      className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-50 text-osttra-teal border border-teal-200">
-                            Active Product
-                          </span>
-                          <span className="text-xs text-slate-400 font-mono">ID: TRM-03</span>
+                      <div
+                        onClick={() => {
+                          setSelectedProduct('ETD');
+                          setView('generator');
+                        }}
+                        className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs border-2 border-teal-100 flex flex-col justify-between ring-2 ring-teal-500/10"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-osttra-teal text-white">
+                              Primary Roadmap
+                            </span>
+                            <span className="text-xs text-teal-700 font-mono font-bold">ID: ETD-CORE</span>
+                          </div>
+                          <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">ETD</h3>
+                          <p className="text-xs font-medium text-slate-500 mt-1">Exchange Traded Derivatives</p>
+                          <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                            Clearing connectivity, SPAN margin microservices, FIX gateway feeds, and post-trade allocation.
+                          </p>
                         </div>
-                        <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">TRM</h3>
-                        <p className="text-xs font-medium text-slate-500 mt-1">Trade Reporting & Monitoring</p>
-                        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                          Global multi-jurisdictional trade reporting (CFTC, EMIR, MAS, ASIC) and reconciliation dashboard.
-                        </p>
+                        <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                          <span>Last updated by: {currentUser} on 11/11/2026</span>
+                        </div>
                       </div>
-                      <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
-                        <span>Last updated by: {currentUser} on 11/11/2026</span>
+
+                      <div
+                        onClick={() => {
+                          setSelectedProduct('TRM');
+                          setView('generator');
+                        }}
+                        className="card-interactive bg-white rounded-2xl p-6 cursor-pointer relative shadow-xs flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-teal-50 text-osttra-teal border border-teal-200">
+                              Active Product
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono">ID: TRM-03</span>
+                          </div>
+                          <h3 className="card-title text-2xl font-bold text-slate-900 transition-colors">TRM</h3>
+                          <p className="text-xs font-medium text-slate-500 mt-1">Trade Reporting & Monitoring</p>
+                          <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                            Global multi-jurisdictional trade reporting (CFTC, EMIR, MAS, ASIC) and reconciliation dashboard.
+                          </p>
+                        </div>
+                        <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                          <span>Last updated by: {currentUser} on 11/11/2026</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

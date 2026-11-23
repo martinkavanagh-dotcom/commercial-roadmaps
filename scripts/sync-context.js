@@ -81,6 +81,8 @@ function getProductContextMarkdown_(productName) {
     key = 'CFM';
   } else if (key.indexOf('ETD') !== -1 || key.indexOf('FUTUR') !== -1 || key.indexOf('OPTION') !== -1 || key.indexOf('EXCHANGE') !== -1) {
     key = 'ETD';
+  } else if (key.indexOf('RATE') !== -1 || key.indexOf('MARKITWIRE') !== -1 || key.indexOf('MW') !== -1 || key.indexOf('IRS') !== -1) {
+    key = 'RATES';
   }
 
   var contexts = {
@@ -108,6 +110,13 @@ function getCfmContextMarkdown_() {
  */
 function getEtdContextMarkdown_() {
   return getProductContextMarkdown_('ETD');
+}
+
+/**
+ * Backwards-compatible alias for Rates (MarkitWire) context.
+ */
+function getRatesContextMarkdown_() {
+  return getProductContextMarkdown_('RATES');
 }
 
 /**

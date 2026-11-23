@@ -297,6 +297,13 @@ function matchProduct_(rowProduct, targetProduct) {
     return true;
   }
 
+  // Flexible alias matching for Rates and MarkitWire
+  const isRatesRow = rp.indexOf('RATE') !== -1 || rp.indexOf('MARKITWIRE') !== -1 || rp.indexOf('IRS') !== -1 || rp.indexOf('MW') !== -1;
+  const isRatesTarget = tp.indexOf('RATE') !== -1 || tp.indexOf('MARKITWIRE') !== -1 || tp.indexOf('IRS') !== -1 || tp.indexOf('MW') !== -1;
+  if (isRatesRow && isRatesTarget) {
+    return true;
+  }
+
   return rp.indexOf(tp) !== -1 || tp.indexOf(rp) !== -1;
 }
 
@@ -338,11 +345,28 @@ function isEtdProduct_(product, key) {
 }
 
 /**
+ * Detects whether a product name or Jira issue key belongs to Rates (OSTTRA Connect for Rates / MarkitWire).
+ */
+function isRatesProduct_(product, key) {
+  const p = String(product || '').trim().toUpperCase();
+  const k = String(key || '').trim().toUpperCase();
+
+  if (p.indexOf('RATE') !== -1 || p.indexOf('MARKITWIRE') !== -1 || p.indexOf('IRS') !== -1 || p.indexOf('SWAP') !== -1 || p.indexOf('MW') !== -1) {
+    return true;
+  }
+  if (k.startsWith('RATES-') || k.startsWith('MW-') || k.startsWith('IRS-') || k.startsWith('RATE-')) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Checks whether authoritative Product Owner markdown context exists for a given product/ticket.
  */
 function hasProductContext_(product, key) {
   if (isCashflowProduct_(product, key)) return true;
   if (isEtdProduct_(product, key)) return true;
+  if (isRatesProduct_(product, key)) return true;
   return false;
 }
 
@@ -659,7 +683,22 @@ function synthesizeCommercialHeadline_(rawTitle, category, product) {
   var theme = 'Functional & Usability';
   var assignedTitle = null;
 
-  if (lower.indexOf('latency') !== -1 || lower.indexOf('throughput') !== -1) {
+  if (lower.indexOf('netting sync') !== -1 || lower.indexOf('compression sync') !== -1) {
+    assignedTitle = 'Real-Time CCP Netting Synchronization & Member Risk Integration Feed';
+    theme = 'Platform Enhancements';
+  } else if (lower.indexOf('cross-currency') !== -1 || lower.indexOf('xccy') !== -1) {
+    assignedTitle = 'Automated Real-Time Cross-Currency Swap Clearing Gateway';
+    theme = 'Connectivity & Coverage';
+  } else if (lower.indexOf('timing report') !== -1 || lower.indexOf('clearing compliance') !== -1) {
+    assignedTitle = 'G15 Peer Clearing Compliance & Velocity Benchmark Analytics Portal';
+    theme = 'Functional & Usability';
+  } else if (lower.indexOf('markitwire') !== -1 || lower.indexOf('legal confirmation') !== -1 || lower.indexOf('isda') !== -1) {
+    assignedTitle = 'Authoritative OTC Derivatives Legal Confirmation & Digital ISDA Engine';
+    theme = 'Functional & Usability';
+  } else if (lower.indexOf('swaption') !== -1 || lower.indexOf('cms') !== -1 || lower.indexOf('irs') !== -1 || lower.indexOf('rate swap') !== -1) {
+    assignedTitle = 'Standardized Interest Rate Derivatives Confirmation & Matching Service';
+    theme = 'Functional & Usability';
+  } else if (lower.indexOf('latency') !== -1 || lower.indexOf('throughput') !== -1) {
     assignedTitle = 'Ultra-Low Latency Execution & High-Throughput Processing Engine';
     theme = 'Platform Enhancements';
   } else if (lower.indexOf('emir') !== -1 || lower.indexOf('refit') !== -1) {
@@ -1391,7 +1430,21 @@ function getPrfRepository_() {
     { id: 'PRF-ETD-007', product: 'ETD', roadmap: 'Q3', deliverable: 'Multi-asset derivatives STP connectivity for regional exchange members', category: 'Strategic', theme: 'Market Expansion', jiraKey: 'ETD-1220' },
     { id: 'PRF-ETD-008', product: 'ETD', roadmap: 'Q3', deliverable: 'Cloud-native zero-downtime database failover cluster deployment', category: 'Tech Debt', theme: 'Resilience', jiraKey: 'ETD-1245' },
     { id: 'PRF-ETD-009', product: 'ETD', roadmap: 'BL', deliverable: 'Predictive trade failure alerts using historical trade discrepancy patterns', category: 'Strategic', theme: 'AI & Analytics', jiraKey: 'ETD-1301' },
-    { id: 'PRF-ETD-010', product: 'ETD', roadmap: 'Delivered', deliverable: 'REST API v2 for position management with OAuth 2.0 mTLS authentication', category: 'Strategic', theme: 'Security & API', jiraKey: 'ETD-998' }
+    { id: 'PRF-ETD-010', product: 'ETD', roadmap: 'Delivered', deliverable: 'REST API v2 for position management with OAuth 2.0 mTLS authentication', category: 'Strategic', theme: 'Security & API', jiraKey: 'ETD-998' },
+
+    // Rates Products (OSTTRA Connect for Rates / MarkitWire)
+    { id: 'PRF-RATES-001', product: 'Rates', roadmap: 'Q4', year: '2025', deliverable: 'Modernize RESTful and WebSocket API endpoints for high-throughput IRS trade affirmation', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-101' },
+    { id: 'PRF-RATES-002', product: 'Rates', roadmap: 'Q4', year: '2025', deliverable: 'Automated LCH SwapClear and CME clearing trade submission with sub-second callbacks', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-102' },
+    { id: 'PRF-RATES-003', product: 'Rates', roadmap: 'Q1', year: '2026', deliverable: 'Real-time Netting Sync API feed for CCP compression and bank risk architecture alignment', category: 'Strategic', theme: 'Platform Enhancements', jiraKey: 'RATES-103' },
+    { id: 'PRF-RATES-004', product: 'Rates', roadmap: 'Q1', year: '2026', deliverable: 'Clearing Compliance Timing Reports benchmarking trade clearing velocity against G15 dealer peers', category: 'Operational Efficiency', theme: 'Functional & Usability', jiraKey: 'RATES-104' },
+    { id: 'PRF-RATES-005', product: 'Rates', roadmap: 'Q2', year: '2026', deliverable: 'Enhanced cross-currency swaps automated clearing routing to global CCPs', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-105' },
+    { id: 'PRF-RATES-006', product: 'Rates', roadmap: 'Q2', year: '2026', deliverable: 'Bunched order block allocation delivery engine for asset managers with child fund splits', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-106' },
+    { id: 'PRF-RATES-007', product: 'Rates', roadmap: 'Q3', year: '2026', deliverable: 'Multi-regime regulatory reporting engine for CFTC, EMIR, and JFSA trade repository feeds', category: 'Regulatory', theme: 'Functional & Usability', jiraKey: 'RATES-107' },
+    { id: 'PRF-RATES-008', product: 'Rates', roadmap: 'Q3', year: '2026', deliverable: 'Cloud-native zero-downtime infrastructure migration for peak market volatility resilience', category: 'Tech Debt', theme: 'Platform Enhancements', jiraKey: 'RATES-108' },
+    { id: 'PRF-RATES-009', product: 'Rates', roadmap: 'BL', year: '2026', deliverable: 'Intelligent AI-assisted contract diagnostics and anomaly detection for bespoke structured rates', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-109' },
+    { id: 'PRF-RATES-010', product: 'Rates', roadmap: 'Delivered', year: '2025', deliverable: 'Universal trade affirmation and legally binding ISDA electronic confirmation engine', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-100' },
+    { id: 'PRF-RATES-011', product: 'Rates', roadmap: 'Q1', year: '2027', deliverable: 'Unified fixed income post-trade convergence connecting OTC rate swaps and repo clearing rails', category: 'Strategic', theme: 'Connectivity & Coverage', jiraKey: 'RATES-110' },
+    { id: 'PRF-RATES-012', product: 'Rates', roadmap: 'Q2', year: '2027', deliverable: 'Automated benchmark transition fallback rules engine for global index replacements', category: 'Strategic', theme: 'Functional & Usability', jiraKey: 'RATES-111' }
   ];
 }
 

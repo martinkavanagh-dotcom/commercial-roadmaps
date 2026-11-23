@@ -841,9 +841,136 @@ test('getProductContextMarkdown_ resolves aliases and returns distinct product o
   assert.ok(content.includes('function getProductContextMarkdown_(productName)'), 'Must have dynamic parameter function');
   assert.ok(content.includes('"ETD"'), 'Must include ETD in compiled contexts map');
   assert.ok(content.includes('"CFM"'), 'Must include CFM in compiled contexts map');
+  assert.ok(content.includes('"RATES"'), 'Must include RATES in compiled contexts map');
   assert.ok(content.includes('15M+ Listed Contracts Processed Daily'), 'Must include ETD proof points from PO file');
   assert.ok(content.includes('70+ ISITC'), 'Must include CFM proof points from PO file');
 });
+
+// Test isRatesProduct_ OTC interest rate derivatives identification
+test('isRatesProduct_ accurately identifies Rates / MarkitWire items and rejects unrelated products', () => {
+  function isRatesProduct_(product, key) {
+    const p = String(product || '').trim().toUpperCase();
+    const k = String(key || '').trim().toUpperCase();
+
+    if (p.indexOf('RATE') !== -1 || p.indexOf('MARKITWIRE') !== -1 || p.indexOf('IRS') !== -1 || p.indexOf('SWAP') !== -1 || p.indexOf('MW') !== -1) {
+      return true;
+    }
+    if (k.startsWith('RATES-') || k.startsWith('MW-') || k.startsWith('IRS-') || k.startsWith('RATE-')) {
+      return true;
+    }
+    return false;
+  }
+
+  // Valid Rates products & keys
+  assert.equal(isRatesProduct_('Rates', 'PRF-1'), true);
+  assert.equal(isRatesProduct_('OSTTRA Connect for Rates', 'PRF-2'), true);
+  assert.equal(isRatesProduct_('MarkitWire', 'PRF-3'), true);
+  assert.equal(isRatesProduct_('Rates & Credit', 'PRF-4'), true);
+  assert.equal(isRatesProduct_('Interest Rate Swaps', 'PRF-5'), true);
+  assert.equal(isRatesProduct_('', 'RATES-101'), true);
+  assert.equal(isRatesProduct_(null, 'MW-202'), true);
+  assert.equal(isRatesProduct_('Unknown', 'IRS-303'), true);
+
+  // Non-Rates products
+  assert.equal(isRatesProduct_('Cash Flow Management', 'CFM-101'), false);
+  assert.equal(isRatesProduct_('ETD', 'ETD-1021'), false);
+  assert.equal(isRatesProduct_('CFD', 'CFD-500'), false);
+  assert.equal(isRatesProduct_('Repo Clearing', 'REPO-99'), false);
+});
+
+// Test hasProductContext_ coverage with Rates
+test('hasProductContext_ verifies product owner markdown context coverage for CFM, ETD, and Rates', () => {
+  function isCashflowProduct_(product, key) {
+    const p = String(product || '').trim().toUpperCase();
+    const k = String(key || '').trim().toUpperCase();
+    return p.indexOf('CFM') !== -1 || p.indexOf('CASH') !== -1 || p.indexOf('FLOW') !== -1 ||
+      k.startsWith('CFM-') || k.startsWith('CFM') || k.startsWith('CASH-');
+  }
+
+  function isEtdProduct_(product, key) {
+    const p = String(product || '').trim().toUpperCase();
+    const k = String(key || '').trim().toUpperCase();
+    return p.indexOf('ETD') !== -1 || p.indexOf('FUTUR') !== -1 || p.indexOf('OPTION') !== -1 ||
+      p.indexOf('EXCHANGE') !== -1 || p.indexOf('LISTED') !== -1 ||
+      k.startsWith('ETD-') || k.startsWith('ALLOC-') || k.startsWith('FUT-') || k.startsWith('OPT-');
+  }
+
+  function isRatesProduct_(product, key) {
+    const p = String(product || '').trim().toUpperCase();
+    const k = String(key || '').trim().toUpperCase();
+    return p.indexOf('RATE') !== -1 || p.indexOf('MARKITWIRE') !== -1 || p.indexOf('IRS') !== -1 ||
+      p.indexOf('SWAP') !== -1 || p.indexOf('MW') !== -1 ||
+      k.startsWith('RATES-') || k.startsWith('MW-') || k.startsWith('IRS-') || k.startsWith('RATE-');
+  }
+
+  function hasProductContext_(product, key) {
+    return isCashflowProduct_(product, key) || isEtdProduct_(product, key) || isRatesProduct_(product, key);
+  }
+
+  // Active products with Markdown context
+  assert.equal(hasProductContext_('CFM', 'CFM-101'), true, 'CFM has context');
+  assert.equal(hasProductContext_('ETD', 'ETD-202'), true, 'ETD has context');
+  assert.equal(hasProductContext_('Rates', 'RATES-101'), true, 'Rates has context');
+  assert.equal(hasProductContext_('MarkitWire', 'MW-500'), true, 'MarkitWire has context');
+
+  // Pending products without markdown context yet
+  assert.equal(hasProductContext_('Credit', 'CDS-101'), false, 'Credit pending context');
+  assert.equal(hasProductContext_('Repo Clearing', 'REPO-505'), false, 'Repo pending context');
+});
+
+// Test PromptContext resolution for Rates (MarkitWire)
+test('getProductContextMarkdown_ resolves Rates aliases and includes core MarkitWire proof points', () => {
+  const promptContextPath = path.resolve(__dirname, '..', 'PromptContext.gs');
+  const content = fs.readFileSync(promptContextPath, 'utf8');
+
+  // Evaluate the compiled functions in a mini VM context
+  const sandbox = {};
+  const vm = require('vm');
+  vm.runInNewContext(content, sandbox);
+
+  assert.equal(typeof sandbox.getProductContextMarkdown_, 'function');
+  assert.equal(typeof sandbox.getRatesContextMarkdown_, 'function');
+
+  const ratesContext = sandbox.getProductContextMarkdown_('Rates');
+  assert.ok(ratesContext.length > 500, 'Rates context should be populated');
+  assert.ok(ratesContext.includes('Pete Altero'), 'Must mention Pete Altero as Commercial Lead');
+  assert.ok(ratesContext.includes('1,700+ connected financial institutions'), 'Must contain 1700+ connected institutions proof point');
+  assert.ok(ratesContext.includes('13 central clearing houses'), 'Must contain 13 central clearing houses');
+  assert.ok(ratesContext.includes('Netting Sync'), 'Must mention Netting Sync');
+  assert.ok(ratesContext.includes('Electronic Legal Confirmation Engine'), 'Must contain legal confirmation engine');
+
+  // Alias verification
+  const mwContext = sandbox.getProductContextMarkdown_('MarkitWire');
+  assert.equal(mwContext, ratesContext, 'MarkitWire alias should resolve to Rates context');
+});
+
+// Test Rates commercial synthesis rules
+test('synthesizeCommercialHeadline_ correctly elevates Rates technical deliverables into commercial propositions', () => {
+  // Test synthesis function with Rates terms
+  const backendCode = fs.readFileSync(path.resolve(__dirname, '..', 'Backend.gs'), 'utf8');
+  
+  // Extract cleanCommercialHeadline_ and synthesizeCommercialHeadline_
+  const sandbox = { Logger: console };
+  const vm = require('vm');
+  vm.runInNewContext(backendCode, sandbox);
+
+  const nettingSync = sandbox.synthesizeCommercialHeadline_('Real-time Netting Sync API feed for CCP compression', 'Strategic', 'Rates');
+  assert.equal(nettingSync.title, 'Real-Time CCP Netting Synchronization & Member Risk Integration Feed');
+  assert.equal(nettingSync.theme, 'Platform Enhancements');
+
+  const xccy = sandbox.synthesizeCommercialHeadline_('Enhanced cross-currency swaps automated clearing routing', 'Strategic', 'Rates');
+  assert.equal(xccy.title, 'Automated Real-Time Cross-Currency Swap Clearing Gateway');
+  assert.equal(xccy.theme, 'Connectivity & Coverage');
+
+  const timingReports = sandbox.synthesizeCommercialHeadline_('Clearing Compliance Timing Reports benchmarking velocity', 'Operational Efficiency', 'Rates');
+  assert.equal(timingReports.title, 'G15 Peer Clearing Compliance & Velocity Benchmark Analytics Portal');
+  assert.equal(timingReports.theme, 'Functional & Usability');
+
+  const isda = sandbox.synthesizeCommercialHeadline_('Universal trade affirmation and legally binding ISDA electronic confirmation engine', 'Strategic', 'Rates');
+  assert.equal(isda.title, 'Authoritative OTC Derivatives Legal Confirmation & Digital ISDA Engine');
+  assert.equal(isda.theme, 'Functional & Usability');
+});
+
 
 
 
